@@ -34,6 +34,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    unoptimized: true, // Añadido para diagnóstico
   },
   // El soporte PWA ahora se maneja con @ducanh2912/next-pwa
 };
