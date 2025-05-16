@@ -33,7 +33,7 @@ export function PurchaseForm() {
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
     defaultValues: {
-      amount: undefined,
+      amount: '' as unknown as number, // Initialize with empty string to avoid uncontrolled to controlled error
       date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), // Store as ISO string
       merchantName: '',
       receiptImage: undefined,
@@ -69,7 +69,12 @@ export function PurchaseForm() {
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
         toast({ title: "Éxito", description: result.message, variant: 'default' });
-        form.reset();
+        form.reset({
+          amount: '' as unknown as number, // Reset with empty string
+          date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+          merchantName: '',
+          receiptImage: undefined,
+        });
         setSelectedFileName(null);
         setPreviewUrl(null);
         setSubmissionStatus('success');
@@ -107,9 +112,16 @@ export function PurchaseForm() {
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto Total</FormLabel>
+                  <FormLabel>Monto Total ($)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Ej: 2500.50" {...field} step="0.01" />
+                    <Input 
+                      type="number" 
+                      placeholder="Ej: 2500.50" 
+                      {...field} 
+                      step="0.01" 
+                      value={field.value === undefined || field.value === null ? '' : field.value} // Ensure value is not undefined
+                      onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
