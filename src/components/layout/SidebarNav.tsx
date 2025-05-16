@@ -10,8 +10,9 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
+  useSidebar, // Importar el hook useSidebar
 } from '@/components/ui/sidebar';
-import { APP_NAME } from '@/config/constants'; // APP_NAME se puede usar para aria-label si es necesario
+import { APP_NAME } from '@/config/constants'; 
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -22,11 +23,18 @@ const navItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar(); // Obtener isMobile y setOpenMobile
+
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false); // Cerrar el menú si es móvil
+    }
+  };
 
   return (
     <nav className="flex flex-col h-full">
       <div className="flex items-center justify-center px-4 py-4 border-b border-sidebar-border h-16">
-         <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`}>
+         <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`} onClick={handleLinkClick}>
             <Image src="/images/ledesc-icon.png" alt="LEDESC Icon" width={32} height={32} priority data-ai-hint="logo abstract" />
             <span 
               style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }} 
@@ -49,7 +57,11 @@ export function SidebarNav() {
                 )}
                 tooltip={item.label}
               >
-                <Link href={item.href} aria-current={pathname === item.href ? "page" : undefined}>
+                <Link 
+                  href={item.href} 
+                  aria-current={pathname === item.href ? "page" : undefined}
+                  onClick={handleLinkClick} // Añadir onClick aquí también
+                >
                   <item.icon className="mr-2 h-5 w-5" />
                   <span>{item.label}</span>
                 </Link>
