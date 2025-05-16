@@ -7,4 +7,4 @@ export const DEFAULT_BENEFIT_SETTINGS: BenefitSettings = {
   enableWeeklyReminders: false,
 };
 
-export const APP_NAME = "Ledesc";
+export const APP_NAME = "LEDESC";
