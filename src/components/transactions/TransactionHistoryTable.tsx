@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Receipt } from 'lucide-react';
+import { Download, FilterX, CalendarDays, Store, Tag, Receipt, MessageSquareText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
@@ -18,9 +18,12 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+
 
 const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; // Special non-empty value
@@ -83,6 +86,7 @@ export function TransactionHistoryTable() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 border rounded-lg shadow-sm bg-card">
         <div>
@@ -159,6 +163,7 @@ export function TransactionHistoryTable() {
               <TableRow>
                 <TableHead className="w-[150px]"><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
                 <TableHead><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
+                <TableHead><MessageSquareText className="inline mr-1 h-4 w-4" />Descripción</TableHead>
                 <TableHead className="text-right">Monto Original</TableHead>
                 <TableHead className="text-right">Descuento</TableHead>
                 <TableHead className="text-right">Monto Final</TableHead>
@@ -170,6 +175,22 @@ export function TransactionHistoryTable() {
                 <TableRow key={purchase.id}>
                   <TableCell>{format(parseISO(purchase.date), 'dd MMM yyyy', { locale: es })}</TableCell>
                   <TableCell className="font-medium">{purchase.merchantName}</TableCell>
+                  <TableCell>
+                    {purchase.description ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="truncate block max-w-[150px] cursor-default">
+                            {purchase.description}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start">
+                          <p className="max-w-xs whitespace-normal break-words">{purchase.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">{formatCurrency(purchase.amount)}</TableCell>
                   <TableCell className="text-right text-green-600">-{formatCurrency(purchase.discountApplied)}</TableCell>
                   <TableCell className="text-right font-semibold">{formatCurrency(purchase.finalAmount)}</TableCell>
@@ -182,6 +203,9 @@ export function TransactionHistoryTable() {
                         <DialogContent className="sm:max-w-[425px]">
                           <DialogHeader>
                             <DialogTitle>Recibo de {purchase.merchantName}</DialogTitle>
+                             <DialogDescription>
+                              Fecha: {format(parseISO(purchase.date), 'dd MMM yyyy', { locale: es })}
+                            </DialogDescription>
                           </DialogHeader>
                           <div className="mt-4 flex justify-center">
                             <Image src={purchase.receiptImageUrl} alt={`Recibo de ${purchase.merchantName}`} width={300} height={400} className="rounded-md object-contain" data-ai-hint="receipt document"/>
@@ -223,6 +247,6 @@ export function TransactionHistoryTable() {
         </div>
       )}
     </div>
+    </TooltipProvider>
   );
 }
-

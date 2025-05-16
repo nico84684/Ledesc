@@ -9,12 +9,12 @@ import { addPurchaseAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label'; // No longer needed directly here
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle } from 'lucide-react';
+import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -33,9 +33,10 @@ export function PurchaseForm() {
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
     defaultValues: {
-      amount: '' as unknown as number, // Initialize with empty string to avoid uncontrolled to controlled error
-      date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), // Store as ISO string
+      amount: '' as unknown as number, 
+      date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), 
       merchantName: '',
+      description: '', // Initialize description
       receiptImage: undefined,
     },
   });
@@ -45,7 +46,7 @@ export function PurchaseForm() {
     if (file) {
       setSelectedFileName(file.name);
       setPreviewUrl(URL.createObjectURL(file));
-      form.setValue('receiptImage', file); // Update RHF state
+      form.setValue('receiptImage', file); 
     } else {
       setSelectedFileName(null);
       setPreviewUrl(null);
@@ -66,13 +67,15 @@ export function PurchaseForm() {
           amount: result.purchase.amount,
           date: result.purchase.date, 
           merchantName: result.purchase.merchantName,
+          description: result.purchase.description,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
         toast({ title: "Éxito", description: result.message, variant: 'default' });
         form.reset({
-          amount: '' as unknown as number, // Reset with empty string
+          amount: '' as unknown as number, 
           date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
           merchantName: '',
+          description: '', // Reset description
           receiptImage: undefined,
         });
         setSelectedFileName(null);
@@ -119,7 +122,7 @@ export function PurchaseForm() {
                       placeholder="Ej: 2500.50" 
                       {...field} 
                       step="0.01" 
-                      value={field.value === undefined || field.value === null ? '' : field.value} // Ensure value is not undefined
+                      value={field.value === undefined || field.value === null ? '' : field.value} 
                       onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     />
                   </FormControl>
@@ -179,6 +182,27 @@ export function PurchaseForm() {
                   <FormLabel>Nombre del Comercio</FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: Restaurante El Sabor" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    <MessageSquareText className="mr-2 h-4 w-4 text-muted-foreground" />
+                    Descripción (Opcional)
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Ej: Almuerzo con equipo, Cena aniversario..."
+                      className="resize-none"
+                      {...field}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

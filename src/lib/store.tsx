@@ -72,6 +72,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const newPurchase: Purchase = {
         ...purchaseData,
         id: new Date().toISOString() + Math.random().toString(),
+        description: purchaseData.description || undefined, // Ensure description is handled
         discountApplied: parseFloat(discountAmount.toFixed(2)),
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
@@ -105,7 +106,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast({ title: "Sin Datos", description: "No hay transacciones para exportar.", variant: "default"});
       return;
     }
-    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Descuento Aplicado", "Monto Final", "URL Recibo"];
+    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
     const csvRows = [
       headers.join(','),
       ...state.purchases.map(p => [
@@ -113,6 +114,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         p.amount,
         format(new Date(p.date), 'yyyy-MM-dd'),
         `"${p.merchantName.replace(/"/g, '""')}"`,
+        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, // Add description to CSV
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''

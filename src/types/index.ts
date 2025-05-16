@@ -4,6 +4,7 @@ export interface Purchase {
   amount: number;
   date: string; // ISO string date
   merchantName: string;
+  description?: string; // Optional description
   receiptImageUrl?: string;
   discountApplied: number; // Amount of discount
   finalAmount: number; // amount - discountApplied

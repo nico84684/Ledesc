@@ -1,3 +1,4 @@
+
 // This file contains server actions.
 // For this prototype, they will interact with the client-side store via context/hooks.
 // In a real application, these would interact with a database.
@@ -29,6 +30,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
     amount: data.amount,
     date: data.date, // Assuming date is already ISO string from form
     merchantName: data.merchantName,
+    description: data.description, // Add description
     receiptImageUrl,
     discountApplied: parseFloat(discountAmount.toFixed(2)),
     finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
