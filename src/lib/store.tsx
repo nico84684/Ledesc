@@ -1,3 +1,4 @@
+
 // This file simulates a client-side store. In a real app, this would be replaced by a backend.
 "use client";
 
@@ -7,6 +8,7 @@ import type { Purchase, BenefitSettings, AppState } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useRouter, usePathname } from 'next/navigation';
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
 const AppDispatchContext = createContext<{
@@ -17,52 +19,64 @@ const AppDispatchContext = createContext<{
 } | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'ledescAppState';
+const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
 export function AppProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { toast } = useToast();
+
   const [state, setState] = useState<AppState>({
     purchases: [],
     settings: DEFAULT_BENEFIT_SETTINGS,
   });
   const [isInitialized, setIsInitialized] = useState(false);
-  const { toast } = useToast();
 
+  // Effect for loading from localStorage (runs once on mount)
   useEffect(() => {
     const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState);
-        // Ensure date objects are correctly handled if stored as strings
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
-          date: p.date, // Assuming dates are stored as ISO strings
+          date: p.date,
         }));
         setState(parsedState);
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
-        setState({ purchases: [], settings: DEFAULT_BENEFIT_SETTINGS });
+        // Potentially reset to defaults or clear corrupted storage
       }
     }
     setIsInitialized(true);
   }, []);
 
+  // Effect for saving state to localStorage and handling initial setup redirect
   useEffect(() => {
     if (isInitialized) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+
+      // Check for initial setup after isInitialized is true and router/pathname are available
+      if (router && pathname) {
+        const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
+        if (!setupComplete && pathname !== '/settings') {
+          router.push('/settings');
+        }
+      }
     }
-  }, [state, isInitialized]);
+  }, [state, isInitialized, router, pathname]);
 
   const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => {
     setState(prevState => {
       const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
       const newPurchase: Purchase = {
         ...purchaseData,
-        id: new Date().toISOString() + Math.random().toString(), // Simple unique ID
+        id: new Date().toISOString() + Math.random().toString(),
         discountApplied: parseFloat(discountAmount.toFixed(2)),
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
       
-      // Check alert threshold
       const currentMonth = format(new Date(), 'yyyy-MM');
       const spentThisMonth = updatedPurchases
         .filter(p => format(new Date(p.date), 'yyyy-MM') === currentMonth)
@@ -70,7 +84,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       const usagePercentage = (spentThisMonth / prevState.settings.monthlyAllowance) * 100;
 
-      if (usagePercentage >= prevState.settings.alertThresholdPercentage) {
+      if (prevState.settings.monthlyAllowance > 0 && usagePercentage >= prevState.settings.alertThresholdPercentage) {
         toast({
           title: "Alerta de Límite de Beneficio",
           description: `Has utilizado ${usagePercentage.toFixed(0)}% de tu beneficio mensual.`,
@@ -78,19 +92,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
       
-      // Simulate weekly reminder logic (very basic)
-      if (prevState.settings.enableWeeklyReminders) {
-        const lastPurchaseDate = updatedPurchases.length > 0 ? new Date(updatedPurchases[0].date) : new Date(0);
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-        if (lastPurchaseDate < oneWeekAgo && updatedPurchases.length > 0) { // only if there's a purchase to compare against
-           // This logic is flawed for actual weekly reminders, as it only triggers on new purchase
-           // A real implementation would use a cron job or background task.
-           // For now, we'll just log it or show a one-time toast if no purchase in 7 days after a purchase.
-           // This part is complex to implement correctly client-side.
-        }
-      }
-
       return { ...prevState, purchases: updatedPurchases };
     });
   }, [toast]);
@@ -104,14 +105,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast({ title: "Sin Datos", description: "No hay transacciones para exportar.", variant: "default"});
       return;
     }
-    const headers = ["ID", "Monto Total", "Fecha", "Comercio", "Descuento Aplicado", "Monto Final", "URL Recibo"];
+    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Descuento Aplicado", "Monto Final", "URL Recibo"];
     const csvRows = [
       headers.join(','),
       ...state.purchases.map(p => [
         p.id,
         p.amount,
         format(new Date(p.date), 'yyyy-MM-dd'),
-        `"${p.merchantName.replace(/"/g, '""')}"`, // Escape double quotes
+        `"${p.merchantName.replace(/"/g, '""')}"`,
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''
@@ -133,7 +134,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast({ title: "Error de Exportación", description: "Tu navegador no soporta la descarga directa.", variant: "destructive"});
     }
   }, [state.purchases, toast]);
-
 
   return (
     <AppStateContext.Provider value={state}>

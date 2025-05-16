@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from 'react-hook-form';
@@ -7,40 +8,60 @@ import { updateSettingsAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-// import { Label } from '@/components/ui/label'; // No longer needed directly here due to FormLabel
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, Save, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useRouter } from 'next/navigation';
+
+const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
 export function SettingsForm() {
-  const { settings, purchases } = useAppState();
+  const { settings } = useAppState(); // Removed purchases as it's not used here
   const { updateSettings: updateSettingsInStore, isInitialized } = useAppDispatch();
   const { toast } = useToast();
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInitialSetup, setIsInitialSetup] = useState(false);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
-    defaultValues: settings, // Initialize with current settings
+    defaultValues: settings,
   });
   
-  // Effect to reset form when settings change from provider (e.g. on initial load)
   useEffect(() => {
-    if (isInitialized && settings) {
-      form.reset(settings);
+    if (isInitialized) {
+      // Check if initial setup is pending when component mounts after store is initialized
+      const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
+      setIsInitialSetup(!setupComplete);
+      if (settings) {
+        form.reset(settings);
+      }
     }
   }, [settings, form, isInitialized]);
 
   async function onSubmit(data: SettingsFormData) {
     setIsSubmitting(true);
+    const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
+
     try {
       const result = await updateSettingsAction(data);
       if (result.success && result.settings) {
         updateSettingsInStore(result.settings);
-        toast({ title: "Éxito", description: result.message });
+
+        if (wasInitialSetupPending) {
+          localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
+          toast({
+            title: "¡Configuración Guardada!",
+            description: "Tu beneficio ha sido configurado. Serás redirigido al dashboard.",
+          });
+          router.push('/');
+        } else {
+          toast({ title: "Éxito", description: "Configuración actualizada exitosamente." });
+        }
       } else {
         toast({ title: "Error", description: result.message, variant: 'destructive' });
       }
@@ -60,12 +81,15 @@ export function SettingsForm() {
     );
   }
 
-
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg">
       <CardHeader>
-        <CardTitle className="text-2xl">Configuración del Beneficio</CardTitle>
-        <CardDescription>Ajusta los parámetros de tu beneficio gastronómico.</CardDescription>
+        <CardTitle className="text-2xl">
+          {isInitialSetup ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
+        </CardTitle>
+        <CardDescription>
+          {isInitialSetup ? "Por favor, establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -143,14 +167,13 @@ export function SettingsForm() {
               </div>
             )}
 
-
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Save className="mr-2 h-4 w-4" />
               )}
-              {isSubmitting ? 'Guardando...' : 'Guardar Configuración'}
+              {isSubmitting ? 'Guardando...' : (isInitialSetup ? 'Guardar Configuración Inicial' : 'Guardar Configuración')}
             </Button>
           </form>
         </Form>
