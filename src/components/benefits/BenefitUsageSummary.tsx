@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useAppState } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { DollarSign, PieChart, TrendingUp } from 'lucide-react';
-import { format, parseISO, isSameMonth } from 'date-fns';
+import { DollarSign, PieChart, TrendingUp, CalendarClock } from 'lucide-react';
+import { format, parseISO, isSameMonth, getDaysInMonth, getDate } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -12,13 +13,17 @@ export function BenefitUsageSummary() {
   const { purchases, settings } = useAppState();
   const isMobile = useIsMobile();
 
-  const currentMonth = new Date();
+  const currentMonthDate = new Date();
   const totalSpentThisMonth = purchases
-    .filter(p => isSameMonth(parseISO(p.date), currentMonth))
+    .filter(p => isSameMonth(parseISO(p.date), currentMonthDate))
     .reduce((sum, p) => sum + p.finalAmount, 0);
 
   const remainingBalance = Math.max(0, settings.monthlyAllowance - totalSpentThisMonth);
   const percentageUsed = settings.monthlyAllowance > 0 ? (totalSpentThisMonth / settings.monthlyAllowance) * 100 : 0;
+
+  const daysInMonth = getDaysInMonth(currentMonthDate);
+  const currentDayOfMonth = getDate(currentMonthDate);
+  const remainingDaysInMonth = daysInMonth - currentDayOfMonth;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
@@ -33,7 +38,7 @@ export function BenefitUsageSummary() {
       <CardHeader>
         <CardTitle className="text-2xl">Resumen del Beneficio Mensual</CardTitle>
         <CardDescription>
-          {format(currentMonth, "MMMM yyyy", { locale: es })}
+          {format(currentMonthDate, "MMMM yyyy", { locale: es })}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -69,6 +74,16 @@ export function BenefitUsageSummary() {
             <span className="text-sm font-semibold text-foreground">{percentageUsed.toFixed(isMobile ? 0 : 1)}%</span>
           </div>
           <Progress value={percentageUsed} aria-label={`${percentageUsed.toFixed(1)}% del beneficio utilizado`} className="h-3" />
+        </div>
+
+        <div className="flex items-center justify-center p-3 border rounded-lg bg-card shadow-sm">
+          <CalendarClock className="h-6 w-6 text-primary mr-3" />
+          <div>
+            <p className="text-lg font-semibold text-foreground">
+              {remainingDaysInMonth} día{remainingDaysInMonth !== 1 ? 's' : ''}
+            </p>
+            <p className="text-sm text-muted-foreground">restantes en el mes</p>
+          </div>
         </div>
       </CardContent>
     </Card>
