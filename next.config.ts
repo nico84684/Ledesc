@@ -1,4 +1,21 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
+import withPWAInit from '@ducanh2912/next-pwa';
+
+const pwaConfig = {
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development', // Deshabilita PWA en desarrollo
+  register: true, // Registra el service worker
+  skipWaiting: true, // Instala el nuevo SW inmediatamente
+  cacheOnFrontEndNav: true, // Cachea navegaciones del lado del cliente (App Router)
+  aggressiveFrontEndNavCaching: true, // Cacheo agresivo de navegaciones (App Router)
+  reloadOnOnline: true, // Recarga la página cuando se recupera la conexión
+  swcMinify: true, // Habilitar minificación con SWC
+  workboxOptions: {
+    disableDevLogs: true, // Deshabilita logs de Workbox en producción
+  },
+};
+
+const withPWA = withPWAInit(pwaConfig);
 
 const nextConfig: NextConfig = {
   /* config options here */
@@ -18,11 +35,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  // Experimental PWA support - not fully mature in Next.js App Router yet without custom setup
-  // For more robust PWA features like offline support, consider using a package like next-pwa
-  // and a custom server worker. This basic setup enables "Add to Home Screen".
-  // output: 'export', // Required for static export if not using a Node.js server, but might affect other features.
-                     // Keep default if deploying to Vercel or similar Node.js environments.
+  // El soporte PWA ahora se maneja con @ducanh2912/next-pwa
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);
