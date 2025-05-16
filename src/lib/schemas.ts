@@ -1,0 +1,23 @@
+import { z } from 'zod';
+
+export const PurchaseFormSchema = z.object({
+  amount: z.coerce.number().min(0.01, "El monto debe ser mayor a 0."),
+  date: z.string().min(1, "La fecha es requerida."),
+  merchantName: z.string().min(1, "El nombre del comercio es requerido.").max(100, "El nombre del comercio no puede exceder los 100 caracteres."),
+  receiptImage: z.custom<File | undefined>()
+    .refine(file => file === undefined || file.size <= 5 * 1024 * 1024, `El tamaño máximo del archivo es 5MB.`)
+    .refine(file => file === undefined || ["image/jpeg", "image/png", "image/webp"].includes(file.type),
+      "Solo se permiten formatos .jpg, .png, .webp."
+    ).optional(),
+});
+
+export type PurchaseFormData = z.infer<typeof PurchaseFormSchema>;
+
+export const SettingsFormSchema = z.object({
+  monthlyAllowance: z.coerce.number().min(1, "El beneficio mensual debe ser mayor a 0."),
+  discountPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo.").max(100, "El porcentaje no puede ser mayor a 100."),
+  alertThresholdPercentage: z.coerce.number().min(0, "El umbral no puede ser negativo.").max(100, "El umbral no puede ser mayor a 100."),
+  enableWeeklyReminders: z.boolean(),
+});
+
+export type SettingsFormData = z.infer<typeof SettingsFormSchema>;
