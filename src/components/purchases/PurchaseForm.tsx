@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -181,7 +182,7 @@ export function PurchaseForm() {
                   <FormControl>
                     <div className="flex items-center gap-2">
                       <Button type="button" variant="outline" asChild className="relative">
-                        <>
+                        <div>
                           <ImageIcon className="mr-2 h-4 w-4" />
                           {selectedFileName ? 'Cambiar archivo' : 'Subir archivo'}
                           <input 
@@ -190,7 +191,7 @@ export function PurchaseForm() {
                             accept="image/png, image/jpeg, image/webp"
                             onChange={handleFileChange}
                           />
-                        </>
+                        </div>
                       </Button>
                       {selectedFileName && <span className="text-sm text-muted-foreground truncate max-w-[150px]">{selectedFileName}</span>}
                     </div>
