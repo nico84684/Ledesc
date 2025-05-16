@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,14 +20,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { Label } from '@/components/ui/label'; // Added import for Label
+import { Label } from '@/components/ui/label';
 
 const ITEMS_PER_PAGE = 10;
+const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; // Special non-empty value
 
 export function TransactionHistoryTable() {
   const { purchases, settings } = useAppState();
   const { exportToCSV, isInitialized } = useAppDispatch();
-  const [filterMonth, setFilterMonth] = useState<string>('');
+  const [filterMonth, setFilterMonth] = useState<string>(''); // "" means all months
   const [filterMerchant, setFilterMerchant] = useState<string>('');
   const [filterAmount, setFilterAmount] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -48,7 +50,7 @@ export function TransactionHistoryTable() {
       const purchaseDate = parseISO(p.date);
       const matchesMonth = filterMonth ? format(purchaseDate, 'yyyy-MM') === filterMonth : true;
       const matchesMerchant = filterMerchant ? p.merchantName.toLowerCase().includes(filterMerchant.toLowerCase()) : true;
-      const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true; // Example: amount >= filter
+      const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true;
       return matchesMonth && matchesMerchant && matchesAmount;
     });
   }, [purchases, filterMonth, filterMerchant, filterAmount]);
@@ -85,12 +87,18 @@ export function TransactionHistoryTable() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 border rounded-lg shadow-sm bg-card">
         <div>
           <Label htmlFor="filter-month" className="text-sm font-medium">Mes</Label>
-          <Select value={filterMonth} onValueChange={setFilterMonth}>
+          <Select
+            value={filterMonth === "" ? ALL_MONTHS_FILTER_VALUE : filterMonth}
+            onValueChange={(value) => {
+              setFilterMonth(value === ALL_MONTHS_FILTER_VALUE ? "" : value);
+              setCurrentPage(1); // Reset to first page on filter change
+            }}
+          >
             <SelectTrigger id="filter-month">
               <SelectValue placeholder="Todos los meses" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos los meses</SelectItem>
+              <SelectItem value={ALL_MONTHS_FILTER_VALUE}>Todos los meses</SelectItem>
               {uniqueMonths.map(month => (
                 <SelectItem key={month} value={month}>
                   {format(parseISO(`${month}-01`), 'MMMM yyyy', { locale: es })}
@@ -105,7 +113,10 @@ export function TransactionHistoryTable() {
             id="filter-merchant"
             placeholder="Buscar por comercio..."
             value={filterMerchant}
-            onChange={e => setFilterMerchant(e.target.value)}
+            onChange={e => {
+              setFilterMerchant(e.target.value);
+              setCurrentPage(1); // Reset to first page
+            }}
           />
         </div>
         <div>
@@ -115,7 +126,10 @@ export function TransactionHistoryTable() {
             type="number"
             placeholder="Ej: 1000"
             value={filterAmount}
-            onChange={e => setFilterAmount(e.target.value)}
+            onChange={e => {
+              setFilterAmount(e.target.value);
+              setCurrentPage(1); // Reset to first page
+            }}
           />
         </div>
         <div className="flex items-end gap-2">
@@ -211,3 +225,4 @@ export function TransactionHistoryTable() {
     </div>
   );
 }
+
