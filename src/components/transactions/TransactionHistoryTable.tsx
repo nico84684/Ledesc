@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { Label } from '@/components/ui/label'; // Added import for Label
 
 const ITEMS_PER_PAGE = 10;
 
@@ -67,7 +68,7 @@ export function TransactionHistoryTable() {
   };
   
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount);
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
   };
 
   if (!isInitialized) {
@@ -112,7 +113,7 @@ export function TransactionHistoryTable() {
           <Input
             id="filter-amount"
             type="number"
-            placeholder="Ej: 10"
+            placeholder="Ej: 1000"
             value={filterAmount}
             onChange={e => setFilterAmount(e.target.value)}
           />

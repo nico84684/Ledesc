@@ -8,7 +8,7 @@ import { addPurchaseAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// import { Label } from '@/components/ui/label'; // No longer needed directly here
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -56,27 +56,14 @@ export function PurchaseForm() {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
     try {
-      // Convert date to a simple YYYY-MM-DD string before sending to action, if action expects that.
-      // Or ensure action handles ISO string correctly. For this example, assuming action handles ISO.
       const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
       
-      const formData = new FormData();
-      formData.append('amount', data.amount.toString());
-      formData.append('date', dateToSend);
-      formData.append('merchantName', data.merchantName);
-      if (data.receiptImage) {
-        formData.append('receiptImage', data.receiptImage);
-      }
-
-      // Server action expects PurchaseFormData, not FormData directly for non-file fields.
-      // For file uploads with server actions, it's common to pass structured data and handle file separately if needed,
-      // or use a library that helps bridge this. Since our action currently takes PurchaseFormData:
       const result = await addPurchaseAction(data, settings);
 
       if (result.success && result.purchase) {
         addPurchaseToStore({
           amount: result.purchase.amount,
-          date: result.purchase.date, // ensure this is the correct format for the store
+          date: result.purchase.date, 
           merchantName: result.purchase.merchantName,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
@@ -97,7 +84,6 @@ export function PurchaseForm() {
     }
   }
   
-  // Effect to clear success/error message after a delay
   useEffect(() => {
     if (submissionStatus === 'success' || submissionStatus === 'error') {
       const timer = setTimeout(() => setSubmissionStatus('idle'), 3000);
@@ -122,7 +108,7 @@ export function PurchaseForm() {
                 <FormItem>
                   <FormLabel>Monto Total</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Ej: 25.50" {...field} step="0.01" />
+                    <Input type="number" placeholder="Ej: 2500.50" {...field} step="0.01" />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -189,7 +175,7 @@ export function PurchaseForm() {
             <FormField
               control={form.control}
               name="receiptImage"
-              render={({ field }) => ( // field is not directly used for input type="file" but for RHF control
+              render={({ field }) => ( 
                 <FormItem>
                   <FormLabel>Imagen del Recibo (Opcional)</FormLabel>
                   <FormControl>
@@ -243,5 +229,3 @@ export function PurchaseForm() {
     </Card>
   );
 }
-
-// Add a new page for the form

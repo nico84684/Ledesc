@@ -21,7 +21,7 @@ export function BenefitUsageSummary() {
   const percentageUsed = settings.monthlyAllowance > 0 ? (totalSpentThisMonth / settings.monthlyAllowance) * 100 : 0;
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(amount); // Assuming EUR, adjust as needed
+    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
   };
 
   if (!settings) {

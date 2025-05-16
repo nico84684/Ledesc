@@ -7,7 +7,7 @@ import { updateSettingsAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+// import { Label } from '@/components/ui/label'; // No longer needed directly here due to FormLabel
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -75,9 +75,9 @@ export function SettingsForm() {
               name="monthlyAllowance"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Beneficio Mensual Total (€)</FormLabel>
+                  <FormLabel>Beneficio Mensual Total ($)</FormLabel>
                   <FormControl>
-                    <Input type="number" placeholder="Ej: 500" {...field} step="0.01" />
+                    <Input type="number" placeholder="Ej: 50000" {...field} step="0.01" />
                   </FormControl>
                   <FormDescription>Monto total disponible cada mes.</FormDescription>
                   <FormMessage />
