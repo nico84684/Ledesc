@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -10,7 +11,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
 } from '@/components/ui/sidebar';
-// APP_NAME ya no se usa directamente en el renderizado del logo aquí si el logo lo incluye.
+import { APP_NAME } from '@/config/constants'; // APP_NAME se puede usar para aria-label si es necesario
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -25,8 +26,15 @@ export function SidebarNav() {
   return (
     <nav className="flex flex-col h-full">
       <div className="flex items-center justify-center px-4 py-4 border-b border-sidebar-border h-16">
-         {/* Ajusta width/height según el aspecto deseado del logo */}
-         <Image src="/images/ledesma-logo.png" alt="Ledesma Logo" width={171} height={36} priority />
+         <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`}>
+            <Image src="/images/ledesc-icon.png" alt="LEDESC Icon" width={32} height={32} priority data-ai-hint="logo abstract" />
+            <span 
+              style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }} 
+              className="text-xl"
+            >
+              LEDESC
+            </span>
+          </Link>
       </div>
       <div className="flex-1 py-4">
         <SidebarMenu>
@@ -52,7 +60,7 @@ export function SidebarNav() {
       </div>
       {/* Optional: Sidebar Footer */}
       {/* <div className="mt-auto p-4 border-t border-sidebar-border">
-        <p className="text-xs text-sidebar-muted-foreground">© {new Date().getFullYear()} APP_NAME_AQUI</p>
+        <p className="text-xs text-sidebar-muted-foreground">© {new Date().getFullYear()} {APP_NAME}</p>
       </div> */}
     </nav>
   );
