@@ -5,7 +5,7 @@
 "use server";
 
 import type { PurchaseFormData, SettingsFormData } from '@/lib/schemas';
-import type { Purchase, BenefitSettings } from '@/types';
+import type { Purchase, BenefitSettings, AppState } from '@/types';
 import { revalidatePath } from 'next/cache';
 
 // Note: Since server actions can't directly call client-side context,
@@ -30,7 +30,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
     amount: data.amount,
     date: data.date, // Assuming date is already ISO string from form
     merchantName: data.merchantName,
-    description: data.description, // Add description
+    description: data.description || undefined, // Add description
     receiptImageUrl,
     discountApplied: parseFloat(discountAmount.toFixed(2)),
     finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
@@ -63,4 +63,24 @@ export async function updateSettingsAction(data: SettingsFormData): Promise<{ su
   revalidatePath('/settings');
 
   return { success: true, message: "Configuración actualizada exitosamente.", settings: newSettings };
+}
+
+export async function backupToGoogleDriveAction(appData: AppState): Promise<{ success: boolean; message: string }> {
+  console.log("Server Action: backupToGoogleDriveAction called.");
+  // This is a simulation. In a real app, this would:
+  // 1. Authenticate with Google (OAuth2)
+  // 2. Use Google Drive API to create/find a folder
+  // 3. Use Google Sheets API to create/update a Sheet with appData.purchases and appData.settings
+  
+  console.log("Simulating backup of data to Google Drive:");
+  console.log("Settings:", JSON.stringify(appData.settings, null, 2));
+  console.log(`Purchases (${appData.purchases.length} items):`, JSON.stringify(appData.purchases.slice(0, 2), null, 2) + (appData.purchases.length > 2 ? "\n... (and more purchases)" : ""));
+
+  // Simulate a delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
+  // The "sync when mobile has connection" part is very complex and would involve
+  // background sync capabilities, likely with a Service Worker, not covered here.
+
+  return { success: true, message: "Backup (simulado) a Google Drive iniciado. Revise la consola del servidor para ver los datos." };
 }
