@@ -7,6 +7,7 @@
 import type { PurchaseFormData, SettingsFormData } from '@/lib/schemas';
 import type { Purchase, BenefitSettings, AppState } from '@/types';
 import { revalidatePath } from 'next/cache';
+import { backupDataToDrive, type BackupDataInput, type BackupDataOutput } from '@/ai/flows/backup-data-flow';
 
 // Note: Since server actions can't directly call client-side context,
 // the actual state update will happen on the client after the action resolves.
@@ -65,22 +66,26 @@ export async function updateSettingsAction(data: SettingsFormData): Promise<{ su
   return { success: true, message: "Configuración actualizada exitosamente.", settings: newSettings };
 }
 
-export async function backupToGoogleDriveAction(appData: AppState): Promise<{ success: boolean; message: string }> {
-  console.log("Server Action: backupToGoogleDriveAction called.");
-  // This is a simulation. In a real app, this would:
-  // 1. Authenticate with Google (OAuth2)
-  // 2. Use Google Drive API to create/find a folder
-  // 3. Use Google Sheets API to create/update a Sheet with appData.purchases and appData.settings
+export async function backupToGoogleDriveAction(appData: AppState): Promise<BackupDataOutput> {
+  console.log("Server Action: backupToGoogleDriveAction llamada. Se invocará el flujo de Genkit.");
   
-  console.log("Simulating backup of data to Google Drive:");
-  console.log("Settings:", JSON.stringify(appData.settings, null, 2));
-  console.log(`Purchases (${appData.purchases.length} items):`, JSON.stringify(appData.purchases.slice(0, 2), null, 2) + (appData.purchases.length > 2 ? "\n... (and more purchases)" : ""));
+  if (!appData || !appData.purchases || !appData.settings) {
+    console.error("Datos de la aplicación incompletos para el backup.");
+    return { success: false, message: "Error: Datos de la aplicación incompletos para el backup." };
+  }
 
-  // Simulate a delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
+  const flowInput: BackupDataInput = {
+    purchases: appData.purchases,
+    settings: appData.settings,
+  };
 
-  // The "sync when mobile has connection" part is very complex and would involve
-  // background sync capabilities, likely with a Service Worker, not covered here.
-
-  return { success: true, message: "Backup (simulado) a Google Drive iniciado. Revise la consola del servidor para ver los datos." };
+  try {
+    // Llamar al flujo de Genkit
+    const result = await backupDataToDrive(flowInput);
+    console.log("Resultado del flujo de Genkit backupDataToDrive:", result);
+    return result;
+  } catch (error: any) {
+    console.error("Error al invocar el flujo de Genkit backupDataToDrive:", error);
+    return { success: false, message: `Error al procesar el respaldo: ${error.message || 'Error desconocido del flujo'}` };
+  }
 }
