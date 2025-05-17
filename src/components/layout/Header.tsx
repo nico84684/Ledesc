@@ -1,7 +1,9 @@
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { APP_NAME } from '@/config/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { AuthButton } from '@/components/auth/AuthComponents'; // Importar AuthButton
 
 export function Header() {
   return (
@@ -15,10 +17,12 @@ export function Header() {
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }} 
           className="text-xl"
         >
-          LEDESC
+          {APP_NAME}
         </span>
       </Link>
-      {/* Future: User menu or other header items can go here */}
+      <div className="ml-auto flex items-center gap-4">
+        <AuthButton /> 
+      </div>
     </header>
   );
 }
