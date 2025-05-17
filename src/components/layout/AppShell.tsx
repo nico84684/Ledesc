@@ -1,3 +1,5 @@
+"use client"; // Asegura que AppShell y sus contextos se ejecuten en el cliente
+
 import type { ReactNode } from 'react';
 import { Header } from './Header';
 import { SidebarNav } from './SidebarNav';

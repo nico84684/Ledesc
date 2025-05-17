@@ -5,7 +5,7 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
-import { SessionProvider } from "next-auth/react"; // Importar SessionProvider
+import { Providers } from '@/components/layout/Providers'; // Importar el nuevo Providers
 
 const fontSans = FontSans({
   subsets: ['latin'],
@@ -49,9 +49,9 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <SessionProvider> {/* Envolver AppShell con SessionProvider */}
+        <Providers> {/* Usar el componente Providers para envolver AppShell */}
           <AppShell>{children}</AppShell>
-        </SessionProvider>
+        </Providers>
       </body>
     </html>
   );
