@@ -5,11 +5,22 @@ import GoogleProvider from 'next-auth/providers/google';
 // Asegúrate de tener estas variables de entorno configuradas
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET
 
+// Verificar la existencia de las variables de entorno críticas
+if (!process.env.GOOGLE_CLIENT_ID) {
+  throw new Error('Error de configuración: Falta la variable de entorno GOOGLE_CLIENT_ID.');
+}
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  throw new Error('Error de configuración: Falta la variable de entorno GOOGLE_CLIENT_SECRET.');
+}
+if (!process.env.AUTH_SECRET) {
+  throw new Error('Error de configuración: Falta la variable de entorno AUTH_SECRET.');
+}
+
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
       // Es crucial solicitar los scopes correctos si planeas usar el token para Google Drive/Sheets
       // Por ahora, solo pediremos los scopes básicos para el login.
       // Para Google Drive: 'https://www.googleapis.com/auth/drive.file'
@@ -21,7 +32,7 @@ export const authOptions: NextAuthOptions = {
       // },
     }),
   ],
-  secret: process.env.AUTH_SECRET as string,
+  secret: process.env.AUTH_SECRET,
   callbacks: {
     async jwt({ token, account }) {
       // Persiste el OAuth access_token en el token JWT si está disponible
