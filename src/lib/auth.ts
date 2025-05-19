@@ -5,6 +5,14 @@ import GoogleProvider from 'next-auth/providers/google';
 // Asegúrate de tener estas variables de entorno configuradas
 // GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, AUTH_SECRET
 
+// Log para verificar las variables de entorno al inicio (se mostrará en los logs del servidor)
+console.log('[AuthOptions Init] Verificando variables de entorno para NextAuth:');
+console.log(`[AuthOptions Init] GOOGLE_CLIENT_ID disponible: ${!!process.env.GOOGLE_CLIENT_ID}`);
+console.log(`[AuthOptions Init] GOOGLE_CLIENT_SECRET disponible: ${!!process.env.GOOGLE_CLIENT_SECRET}`);
+console.log(`[AuthOptions Init] AUTH_SECRET disponible: ${!!process.env.AUTH_SECRET}`);
+console.log(`[AuthOptions Init] NEXTAUTH_URL: ${process.env.NEXTAUTH_URL || 'No definida (usará valor predeterminado por NextAuth si es posible en desarrollo)'}`);
+
+
 // Verificar la existencia de las variables de entorno críticas
 if (!process.env.GOOGLE_CLIENT_ID) {
   console.error('ERROR CRITICO DE CONFIGURACION: Falta la variable de entorno GOOGLE_CLIENT_ID.');
@@ -19,19 +27,12 @@ if (!process.env.AUTH_SECRET) {
   throw new Error('Error de configuración: Falta la variable de entorno AUTH_SECRET.');
 }
 
-// Log para verificar las variables de entorno al inicio (se mostrará en los logs del servidor)
-console.log('[AuthOptions Init] Verificando variables de entorno para NextAuth:');
-console.log(`[AuthOptions Init] GOOGLE_CLIENT_ID disponible: ${!!process.env.GOOGLE_CLIENT_ID}`);
-console.log(`[AuthOptions Init] GOOGLE_CLIENT_SECRET disponible: ${!!process.env.GOOGLE_CLIENT_SECRET}`);
-console.log(`[AuthOptions Init] AUTH_SECRET disponible: ${!!process.env.AUTH_SECRET}`);
-console.log(`[AuthOptions Init] NEXTAUTH_URL: ${process.env.NEXTAUTH_URL || 'No definida (usará valor predeterminado por NextAuth si es posible en desarrollo)'}`);
-
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       // Es crucial solicitar los scopes correctos si planeas usar el token para Google Drive/Sheets
       // Por ahora, solo pediremos los scopes básicos para el login.
       // Para Google Drive: 'https://www.googleapis.com/auth/drive.file'
@@ -62,10 +63,12 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+  // Habilitar logs de depuración de next-auth
+  // En un entorno de producción real, querrías condicionar esto a process.env.NODE_ENV === 'development'
+  debug: true, 
   // pages: { // Opcional: si quieres páginas personalizadas para login, error, etc.
   //   signIn: '/auth/signin',
   // }
 };
 
 export default NextAuth(authOptions);
-
