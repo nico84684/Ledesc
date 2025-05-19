@@ -7,14 +7,25 @@ import GoogleProvider from 'next-auth/providers/google';
 
 // Verificar la existencia de las variables de entorno críticas
 if (!process.env.GOOGLE_CLIENT_ID) {
+  console.error('ERROR CRITICO DE CONFIGURACION: Falta la variable de entorno GOOGLE_CLIENT_ID.');
   throw new Error('Error de configuración: Falta la variable de entorno GOOGLE_CLIENT_ID.');
 }
 if (!process.env.GOOGLE_CLIENT_SECRET) {
+  console.error('ERROR CRITICO DE CONFIGURACION: Falta la variable de entorno GOOGLE_CLIENT_SECRET.');
   throw new Error('Error de configuración: Falta la variable de entorno GOOGLE_CLIENT_SECRET.');
 }
 if (!process.env.AUTH_SECRET) {
+  console.error('ERROR CRITICO DE CONFIGURACION: Falta la variable de entorno AUTH_SECRET.');
   throw new Error('Error de configuración: Falta la variable de entorno AUTH_SECRET.');
 }
+
+// Log para verificar las variables de entorno al inicio (se mostrará en los logs del servidor)
+console.log('[AuthOptions Init] Verificando variables de entorno para NextAuth:');
+console.log(`[AuthOptions Init] GOOGLE_CLIENT_ID disponible: ${!!process.env.GOOGLE_CLIENT_ID}`);
+console.log(`[AuthOptions Init] GOOGLE_CLIENT_SECRET disponible: ${!!process.env.GOOGLE_CLIENT_SECRET}`);
+console.log(`[AuthOptions Init] AUTH_SECRET disponible: ${!!process.env.AUTH_SECRET}`);
+console.log(`[AuthOptions Init] NEXTAUTH_URL: ${process.env.NEXTAUTH_URL || 'No definida (usará valor predeterminado por NextAuth si es posible en desarrollo)'}`);
+
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -57,3 +68,4 @@ export const authOptions: NextAuthOptions = {
 };
 
 export default NextAuth(authOptions);
+
