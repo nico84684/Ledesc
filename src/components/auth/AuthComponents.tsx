@@ -1,7 +1,14 @@
 
 "use client";
 
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useState, useEffect } from "react";
+import { auth, googleProvider } from "@/lib/firebase";
+import { 
+  signInWithPopup, 
+  signOut as firebaseSignOut, 
+  onAuthStateChanged,
+  type User 
+} from "firebase/auth";
 import { Button } from "@/components/ui/button";
 import { LogIn, LogOut, UserCircle } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,23 +20,57 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { LoadingSpinner } from "../common/LoadingSpinner";
 
 export function AuthButton() {
-  const { data: session, status } = useSession();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  if (status === "loading") {
-    return <Button variant="ghost" size="sm" disabled>Cargando...</Button>;
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+      setLoading(false);
+    });
+    return () => unsubscribe(); // Cleanup subscription on unmount
+  }, []);
+
+  const handleSignIn = async () => {
+    setLoading(true);
+    try {
+      await signInWithPopup(auth, googleProvider);
+      // onAuthStateChanged will handle setting currentUser
+    } catch (error) {
+      console.error("Error signing in with Google:", error);
+      // Consider showing a toast message to the user
+      setLoading(false);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setLoading(true);
+    try {
+      await firebaseSignOut(auth);
+      // onAuthStateChanged will handle setting currentUser to null
+    } catch (error) {
+      console.error("Error signing out:", error);
+      // Consider showing a toast message to the user
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <Button variant="ghost" size="sm" disabled><LoadingSpinner size={16} className="mr-2" />Cargando...</Button>;
   }
 
-  if (session) {
+  if (currentUser) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" className="relative h-8 w-8 rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src={session.user?.image ?? undefined} alt={session.user?.name ?? "Usuario"} />
+              <AvatarImage src={currentUser.photoURL ?? undefined} alt={currentUser.displayName ?? "Usuario"} />
               <AvatarFallback>
-                {session.user?.name ? session.user.name.charAt(0).toUpperCase() : <UserCircle size={20}/>}
+                {currentUser.displayName ? currentUser.displayName.charAt(0).toUpperCase() : <UserCircle size={20}/>}
               </AvatarFallback>
             </Avatar>
           </Button>
@@ -38,15 +79,15 @@ export function AuthButton() {
           <DropdownMenuLabel className="font-normal">
             <div className="flex flex-col space-y-1">
               <p className="text-sm font-medium leading-none">
-                {session.user?.name}
+                {currentUser.displayName}
               </p>
               <p className="text-xs leading-none text-muted-foreground">
-                {session.user?.email}
+                {currentUser.email}
               </p>
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => signOut()}>
+          <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />
             Cerrar Sesión
           </DropdownMenuItem>
@@ -56,7 +97,7 @@ export function AuthButton() {
   }
 
   return (
-    <Button onClick={() => signIn("google")} variant="outline" size="sm">
+    <Button onClick={handleSignIn} variant="outline" size="sm">
       <LogIn className="mr-2 h-4 w-4" />
       Iniciar Sesión con Google
     </Button>

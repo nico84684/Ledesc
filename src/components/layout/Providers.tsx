@@ -1,16 +1,16 @@
+
 "use client";
 
 import type { ReactNode } from 'react';
-import { SessionProvider } from "next-auth/react";
+// SessionProvider ya no es necesario aquí si solo usamos Firebase Auth para el login
+// import { SessionProvider } from "next-auth/react"; 
 
 interface ProvidersProps {
   children: ReactNode;
 }
 
 export function Providers({ children }: ProvidersProps) {
-  return (
-    <SessionProvider>
-      {children}
-    </SessionProvider>
-  );
+  // Si tienes otros proveedores de contexto global, pueden ir aquí.
+  // Por ahora, solo devolvemos children ya que SessionProvider fue removido.
+  return <>{children}</>;
 }
