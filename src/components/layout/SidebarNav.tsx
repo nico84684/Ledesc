@@ -10,7 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  useSidebar, // Importar el hook useSidebar
+  useSidebar, 
 } from '@/components/ui/sidebar';
 import { APP_NAME } from '@/config/constants'; 
 
@@ -23,11 +23,11 @@ const navItems = [
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { isMobile, setOpenMobile } = useSidebar(); // Obtener isMobile y setOpenMobile
+  const { isMobile, setOpenMobile } = useSidebar(); 
 
   const handleLinkClick = () => {
     if (isMobile) {
-      setOpenMobile(false); // Cerrar el menú si es móvil
+      setOpenMobile(false); 
     }
   };
 
@@ -35,12 +35,20 @@ export function SidebarNav() {
     <nav className="flex flex-col h-full">
       <div className="flex items-center justify-center px-4 py-4 border-b border-sidebar-border h-16">
          <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`} onClick={handleLinkClick}>
-            <Image src="/images/ledesc-icon.png" alt="LEDESC Icon" width={32} height={32} priority data-ai-hint="logo abstract" />
+            <Image 
+              src="/images/ledesc-icon.png" 
+              alt="LEDESC Icon" 
+              width={32} 
+              height={32} 
+              priority 
+              data-ai-hint="logo abstract"
+              className="h-8 w-8" // Asegura consistencia con props width/height
+            />
             <span 
               style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }} 
               className="text-xl"
             >
-              LEDESC
+              {APP_NAME}
             </span>
           </Link>
       </div>
@@ -60,7 +68,7 @@ export function SidebarNav() {
                 <Link 
                   href={item.href} 
                   aria-current={pathname === item.href ? "page" : undefined}
-                  onClick={handleLinkClick} // Añadir onClick aquí también
+                  onClick={handleLinkClick} 
                 >
                   <item.icon className="mr-2 h-5 w-5" />
                   <span>{item.label}</span>
@@ -77,3 +85,4 @@ export function SidebarNav() {
     </nav>
   );
 }
+
