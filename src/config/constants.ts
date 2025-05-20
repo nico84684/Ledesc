@@ -1,8 +1,9 @@
+
 import type { BenefitSettings } from '@/types';
 
 export const DEFAULT_BENEFIT_SETTINGS: BenefitSettings = {
-  monthlyAllowance: 50000, // Example value in ARS
-  discountPercentage: 15, // Example 15%
+  monthlyAllowance: 68500, // Actualizado a 68500 ARS
+  discountPercentage: 70, // Actualizado a 70%
   alertThresholdPercentage: 80, // Example 80%
   enableWeeklyReminders: false,
 };
