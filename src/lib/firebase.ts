@@ -13,7 +13,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBTs8eDliTZFsYILU09WWM-Tdh1RpmEGSY",
   authDomain: "ledescapp.firebaseapp.com",
   projectId: "ledescapp",
-  storageBucket: "ledescapp.firebasestorage.app", // Actualizado al valor que proporcionaste
+  storageBucket: "ledescapp.firebasestorage.app", // Confirmado por el usuario
   messagingSenderId: "1068604912509",
   appId: "1:1068604912509:web:e0cb345e0e9a225aef9214",
   measurementId: "G-Y8NS9CH2WF"
