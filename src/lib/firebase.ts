@@ -1,3 +1,4 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider } from "firebase/auth";
@@ -12,7 +13,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBTs8eDliTZFsYILU09WWM-Tdh1RpmEGSY",
   authDomain: "ledescapp.firebaseapp.com",
   projectId: "ledescapp",
-  storageBucket: "ledescapp.appspot.com", // Corregido el dominio, usualmente es .appspot.com
+  storageBucket: "ledescapp.firebasestorage.app", // Actualizado al valor que proporcionaste
   messagingSenderId: "1068604912509",
   appId: "1:1068604912509:web:e0cb345e0e9a225aef9214",
   measurementId: "G-Y8NS9CH2WF"
@@ -31,7 +32,14 @@ const googleProvider = new GoogleAuthProvider();
 
 let analytics: Analytics | undefined;
 if (typeof window !== 'undefined') {
-  analytics = getAnalytics(app);
+  // Initialize Analytics only on the client side
+  try {
+    analytics = getAnalytics(app);
+  } catch (error) {
+    console.warn("Firebase Analytics could not be initialized:", error);
+    // This can happen if Firebase is blocked or due to other client-side issues.
+    // The app can continue without Analytics.
+  }
 }
 
 export { app, auth, googleProvider, analytics };
