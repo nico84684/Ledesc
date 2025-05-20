@@ -27,40 +27,70 @@ export function AuthButton() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log("[AuthButton] Subscribing to onAuthStateChanged.");
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        console.log("[AuthButton] onAuthStateChanged: User IS signed IN.", { uid: user.uid, email: user.email, displayName: user.displayName });
+      } else {
+        console.log("[AuthButton] onAuthStateChanged: User IS signed OUT.");
+      }
       setCurrentUser(user);
       setLoading(false);
+      console.log("[AuthButton] onAuthStateChanged: setLoading(false), currentUser set.");
     });
-    return () => unsubscribe(); // Cleanup subscription on unmount
+    return () => {
+      console.log("[AuthButton] Unsubscribing from onAuthStateChanged.");
+      unsubscribe();
+    }; 
   }, []);
 
   const handleSignIn = async () => {
     setLoading(true);
+    console.log("[AuthButton] handleSignIn: Attempting sign-in...");
     try {
-      await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged will handle setting currentUser and setLoading(false) on success
-    } catch (error: any) { // Especificar 'any' para acceder a 'code'
-      if (error.code === 'auth/popup-closed-by-user') {
-        console.info("Firebase sign-in popup closed by user.");
-      } else if (error.code === 'auth/cancelled-popup-request') {
-        console.info("Firebase sign-in popup request cancelled (e.g., multiple popups opened).");
+      const result = await signInWithPopup(auth, googleProvider);
+      console.log("[AuthButton] handleSignIn: signInWithPopup promise resolved. Result:", result);
+      if (result && result.user) {
+        console.log("[AuthButton] handleSignIn: User details from signInWithPopup result:", { uid: result.user.uid, email: result.user.email, displayName: result.user.displayName });
       } else {
-        console.error("Error signing in with Google:", error);
-        // Consider showing a toast message to the user for other types of errors
+        console.warn("[AuthButton] handleSignIn: signInWithPopup result or result.user is null/undefined.");
       }
-      setLoading(false); // Ensure loading is stopped on any sign-in error
+      // No es necesario llamar a setLoading(false) aquí si onAuthStateChanged lo hace.
+      // onAuthStateChanged debería ser el único responsable de actualizar currentUser y setLoading.
+    } catch (error: any) { 
+      console.error("[AuthButton] handleSignIn: Error during signInWithPopup:", { code: error.code, message: error.message });
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.info("[AuthButton] handleSignIn: Firebase sign-in popup closed by user.");
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.info("[AuthButton] handleSignIn: Firebase sign-in popup request cancelled.");
+      } else {
+        console.error("[AuthButton] handleSignIn: Other Firebase sign-in error:", error);
+      }
+      // Si hay un error, onAuthStateChanged podría no dispararse con un nuevo usuario, 
+      // o podría dispararse con `null`. El `setLoading(false)` en `onAuthStateChanged`
+      // debería eventualmente ejecutarse. Si no, la UI podría quedar en "loading".
+      // Para asegurar que la UI no quede en "loading" en caso de error aquí,
+      // podemos considerar un setLoading(false) si `onAuthStateChanged` no lo hace.
+      // Por ahora, confiamos en que onAuthStateChanged (que siempre se llama al inicio y en cambios) limpiará el loading.
+      // De hecho, si aquí ocurre un error, onAuthStateChanged ya se habrá ejecutado al inicio
+      // con user=null y loading=false. Si luego el usuario intenta loguearse y falla aquí,
+      // setLoading(true) se llamó, pero si onAuthStateChanged no se vuelve a disparar, quedaría en true.
+      // Por lo tanto, es prudente poner setLoading(false) en el catch si el error no es uno que
+      // vaya a ser seguido por una llamada a onAuthStateChanged.
+      setLoading(false); // Asegurar que el spinner se detenga si hay un error aquí.
     }
   };
 
   const handleSignOut = async () => {
     setLoading(true);
+    console.log("[AuthButton] handleSignOut: Attempting sign-out...");
     try {
       await firebaseSignOut(auth);
+      console.log("[AuthButton] handleSignOut: firebaseSignOut successful.");
       // onAuthStateChanged will handle setting currentUser to null and setLoading(false)
     } catch (error) {
-      console.error("Error signing out:", error);
-      // Consider showing a toast message to the user
-      setLoading(false);
+      console.error("[AuthButton] handleSignOut: Error signing out:", error);
+      setLoading(false); // Asegurar que el spinner se detenga si hay un error aquí.
     }
   };
 
@@ -109,3 +139,4 @@ export function AuthButton() {
     </Button>
   );
 }
+
