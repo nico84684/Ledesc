@@ -30,7 +30,7 @@ export function AuthButton() {
     console.log("[AuthButton] Subscribing to onAuthStateChanged.");
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        console.log("[AuthButton] onAuthStateChanged: User IS signed IN.", { uid: user.uid, email: user.email, displayName: user.displayName });
+        console.log("[AuthButton] onAuthStateChanged: User IS signed IN.", { uid: user.uid, email: user.email, displayName: user.displayName, photoURL: user.photoURL });
       } else {
         console.log("[AuthButton] onAuthStateChanged: User IS signed OUT.");
       }
@@ -48,36 +48,29 @@ export function AuthButton() {
     setLoading(true);
     console.log("[AuthButton] handleSignIn: Attempting sign-in...");
     try {
+      // La persistencia ya debería estar configurada en firebase.ts
       const result = await signInWithPopup(auth, googleProvider);
       console.log("[AuthButton] handleSignIn: signInWithPopup promise resolved. Result:", result);
       if (result && result.user) {
         console.log("[AuthButton] handleSignIn: User details from signInWithPopup result:", { uid: result.user.uid, email: result.user.email, displayName: result.user.displayName });
+        // No es necesario llamar a setCurrentUser aquí, onAuthStateChanged lo hará.
       } else {
         console.warn("[AuthButton] handleSignIn: signInWithPopup result or result.user is null/undefined.");
+        setLoading(false); // Asegurar que el spinner se detenga si no hay usuario en el resultado
       }
-      // No es necesario llamar a setLoading(false) aquí si onAuthStateChanged lo hace.
-      // onAuthStateChanged debería ser el único responsable de actualizar currentUser y setLoading.
     } catch (error: any) { 
-      console.error("[AuthButton] handleSignIn: Error during signInWithPopup:", { code: error.code, message: error.message });
+      console.error("[AuthButton] handleSignIn: Error during signInWithPopup:", { code: error.code, message: error.message, errorObject: error });
       if (error.code === 'auth/popup-closed-by-user') {
         console.info("[AuthButton] handleSignIn: Firebase sign-in popup closed by user.");
       } else if (error.code === 'auth/cancelled-popup-request') {
         console.info("[AuthButton] handleSignIn: Firebase sign-in popup request cancelled.");
-      } else {
+      } else if (error.code === 'auth/operation-not-allowed' || error.message.includes("Access to storage is not allowed")) {
+        console.error("[AuthButton] handleSignIn: Firebase operation not allowed, possibly due to storage restrictions. Check Firebase console and browser/iframe policies.");
+      }
+      else {
         console.error("[AuthButton] handleSignIn: Other Firebase sign-in error:", error);
       }
-      // Si hay un error, onAuthStateChanged podría no dispararse con un nuevo usuario, 
-      // o podría dispararse con `null`. El `setLoading(false)` en `onAuthStateChanged`
-      // debería eventualmente ejecutarse. Si no, la UI podría quedar en "loading".
-      // Para asegurar que la UI no quede en "loading" en caso de error aquí,
-      // podemos considerar un setLoading(false) si `onAuthStateChanged` no lo hace.
-      // Por ahora, confiamos en que onAuthStateChanged (que siempre se llama al inicio y en cambios) limpiará el loading.
-      // De hecho, si aquí ocurre un error, onAuthStateChanged ya se habrá ejecutado al inicio
-      // con user=null y loading=false. Si luego el usuario intenta loguearse y falla aquí,
-      // setLoading(true) se llamó, pero si onAuthStateChanged no se vuelve a disparar, quedaría en true.
-      // Por lo tanto, es prudente poner setLoading(false) en el catch si el error no es uno que
-      // vaya a ser seguido por una llamada a onAuthStateChanged.
-      setLoading(false); // Asegurar que el spinner se detenga si hay un error aquí.
+      setLoading(false); 
     }
   };
 
@@ -90,7 +83,7 @@ export function AuthButton() {
       // onAuthStateChanged will handle setting currentUser to null and setLoading(false)
     } catch (error) {
       console.error("[AuthButton] handleSignOut: Error signing out:", error);
-      setLoading(false); // Asegurar que el spinner se detenga si hay un error aquí.
+      setLoading(false); 
     }
   };
 
@@ -139,4 +132,3 @@ export function AuthButton() {
     </Button>
   );
 }
-
