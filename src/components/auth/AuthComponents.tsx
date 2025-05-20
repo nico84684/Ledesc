@@ -38,11 +38,17 @@ export function AuthButton() {
     setLoading(true);
     try {
       await signInWithPopup(auth, googleProvider);
-      // onAuthStateChanged will handle setting currentUser
-    } catch (error) {
-      console.error("Error signing in with Google:", error);
-      // Consider showing a toast message to the user
-      setLoading(false);
+      // onAuthStateChanged will handle setting currentUser and setLoading(false) on success
+    } catch (error: any) { // Especificar 'any' para acceder a 'code'
+      if (error.code === 'auth/popup-closed-by-user') {
+        console.info("Firebase sign-in popup closed by user.");
+      } else if (error.code === 'auth/cancelled-popup-request') {
+        console.info("Firebase sign-in popup request cancelled (e.g., multiple popups opened).");
+      } else {
+        console.error("Error signing in with Google:", error);
+        // Consider showing a toast message to the user for other types of errors
+      }
+      setLoading(false); // Ensure loading is stopped on any sign-in error
     }
   };
 
@@ -50,7 +56,7 @@ export function AuthButton() {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle setting currentUser to null
+      // onAuthStateChanged will handle setting currentUser to null and setLoading(false)
     } catch (error) {
       console.error("Error signing out:", error);
       // Consider showing a toast message to the user
