@@ -55,17 +55,18 @@ export function AuthButton() {
         console.log("[AuthButton] handleSignIn: User details from signInWithPopup result:", { uid: result.user.uid, email: result.user.email, displayName: result.user.displayName });
         // No es necesario llamar a setCurrentUser aquí, onAuthStateChanged lo hará.
       } else {
-        console.warn("[AuthButton] handleSignIn: signInWithPopup result or result.user is null/undefined.");
-        setLoading(false); // Asegurar que el spinner se detenga si no hay usuario en el resultado
+        // Esto es improbable si la promesa se resuelve sin error y sin usuario,
+        // pero se mantiene por si acaso. onAuthStateChanged es la fuente de verdad.
+        console.warn("[AuthButton] handleSignIn: signInWithPopup result or result.user is null/undefined, but no error was caught. This is unexpected.");
       }
     } catch (error: any) { 
       console.error("[AuthButton] handleSignIn: Error during signInWithPopup:", { code: error.code, message: error.message, errorObject: error });
       if (error.code === 'auth/popup-closed-by-user') {
-        console.info("[AuthButton] handleSignIn: Firebase sign-in popup closed by user.");
+        console.info("[AuthButton] handleSignIn: Firebase sign-in popup closed by user. This often happens if an underlying issue (like storage access or misconfiguration) prevents the popup from working correctly.");
       } else if (error.code === 'auth/cancelled-popup-request') {
         console.info("[AuthButton] handleSignIn: Firebase sign-in popup request cancelled.");
-      } else if (error.code === 'auth/operation-not-allowed' || error.message.includes("Access to storage is not allowed")) {
-        console.error("[AuthButton] handleSignIn: Firebase operation not allowed, possibly due to storage restrictions. Check Firebase console and browser/iframe policies.");
+      } else if (error.code === 'auth/operation-not-allowed' || (error.message && error.message.toLowerCase().includes("access to storage is not allowed"))) {
+        console.error("[AuthButton] handleSignIn: Firebase operation not allowed. This might be due to: 1. Storage restrictions in the environment (e.g., iframes, strict cookie policies). 2. The Identity Platform/Google Sign-In API not being fully enabled or configured for your Firebase project in Google Cloud Console. 3. Incorrect API key restrictions in Google Cloud Console (ensure your Firebase Studio domain is allowed if using HTTP referer restrictions).", { errorCode: error.code });
       }
       else {
         console.error("[AuthButton] handleSignIn: Other Firebase sign-in error:", error);
@@ -80,7 +81,6 @@ export function AuthButton() {
     try {
       await firebaseSignOut(auth);
       console.log("[AuthButton] handleSignOut: firebaseSignOut successful.");
-      // onAuthStateChanged will handle setting currentUser to null and setLoading(false)
     } catch (error) {
       console.error("[AuthButton] handleSignOut: Error signing out:", error);
       setLoading(false); 

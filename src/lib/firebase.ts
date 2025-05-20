@@ -1,12 +1,12 @@
+
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { 
   getAuth, 
   GoogleAuthProvider, 
-  setPersistence, // Importar setPersistence
-  inMemoryPersistence, // Importar inMemoryPersistence
-  browserLocalPersistence, // Para referencia futura
-  onAuthStateChanged // Para logs
+  setPersistence,
+  inMemoryPersistence,
+  onAuthStateChanged
 } from "firebase/auth";
 import { getAnalytics, type Analytics } from "firebase/analytics";
 
@@ -38,20 +38,20 @@ const googleProvider = new GoogleAuthProvider();
 console.log("[Firebase] GoogleAuthProvider instance created.");
 
 // Configurar persistencia ANTES de cualquier operación de autenticación
-// Intentamos inMemoryPersistence para evitar problemas de acceso al almacenamiento.
 if (typeof window !== 'undefined') {
   setPersistence(auth, inMemoryPersistence)
     .then(() => {
-      console.log("[Firebase] Auth persistence successfully set to inMemoryPersistence.");
+      console.log("[Firebase] Auth persistence successfully set to inMemoryPersistence. No local storage should be used by Firebase Auth for session persistence.");
     })
     .catch((error) => {
-      console.error("[Firebase] Error setting auth persistence to inMemoryPersistence:", error);
-      // Como fallback, podríamos intentar no establecer persistencia explícitamente
-      // o intentar browserLocalPersistence si el error no es por acceso,
-      // pero si el error es "Access to storage is not allowed", browserLocalPersistence también fallaría.
+      console.error("[Firebase] CRITICAL Error setting auth persistence to inMemoryPersistence:", {
+        code: error.code,
+        message: error.message,
+        errorObject: error,
+      });
     });
 } else {
-  console.log("[Firebase] Not in browser, skipping setPersistence.");
+  console.log("[Firebase] Not in browser, skipping setPersistence for auth.");
 }
 
 // Log para onAuthStateChanged para depuración
