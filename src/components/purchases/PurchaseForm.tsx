@@ -25,7 +25,7 @@ import type { Merchant } from '@/types';
 
 export function PurchaseForm() {
   const { addPurchase: addPurchaseToStore } = useAppDispatch();
-  const { settings, merchants } = useAppState(); // Obtener merchants del estado
+  const { settings, merchants } = useAppState();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -36,7 +36,7 @@ export function PurchaseForm() {
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
     defaultValues: {
-      amount: '' as unknown as number,
+      amount: '' as unknown as number, // Inicializar como string vacío para evitar error de uncontrolled/controlled
       date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
       merchantName: '',
       merchantLocation: '',
@@ -62,7 +62,8 @@ export function PurchaseForm() {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
     try {
-      const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
+      // La fecha ya está en formato ISO string desde el estado del formulario
+      // const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
 
       const result = await addPurchaseAction(data, settings);
 
@@ -71,7 +72,7 @@ export function PurchaseForm() {
           amount: result.purchase.amount,
           date: result.purchase.date,
           merchantName: result.purchase.merchantName,
-          merchantLocation: data.merchantLocation, // Pasar la ubicación del formulario
+          merchantLocation: data.merchantLocation, 
           description: result.purchase.description,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
@@ -209,29 +210,25 @@ export function PurchaseForm() {
                           {field.value
                             ? merchants.find(
                                 (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase()
-                              )?.name ?? field.value
+                              )?.name ?? field.value 
                             : "Seleccionar o escribir comercio..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command shouldFilter={false} // Desactivar filtro interno de Command, ya que tenemos Input
-                      > 
+                      <Command> 
                         <CommandInput
-                          placeholder="Buscar comercio o añadir nuevo..."
-                          value={field.value}
+                          placeholder="Buscar o escribir nuevo..."
+                          value={field.value || ''} 
                           onValueChange={(currentValue) => {
-                            field.onChange(currentValue); // Actualiza el valor del formulario
-                            // Si el valor escrito coincide con un comercio existente, autocompletar ubicación
+                            field.onChange(currentValue); 
                             const matchedMerchant = merchants.find(m => m.name.toLowerCase() === currentValue.toLowerCase());
                             if (matchedMerchant) {
                                 form.setValue('merchantLocation', matchedMerchant.location || '');
-                            } else {
-                                // Opcional: limpiar ubicación si no coincide con ningún comercio,
-                                // o dejar que el usuario la escriba.
-                                // form.setValue('merchantLocation', ''); 
                             }
+                            // No limpiar merchantLocation si no hay match exacto, 
+                            // para permitir al usuario definirla si es un nuevo comercio.
                           }}
                         />
                         <CommandList>
@@ -242,10 +239,11 @@ export function PurchaseForm() {
                             {merchants.map((merchant: Merchant) => (
                               <CommandItem
                                 key={merchant.id}
-                                value={merchant.name}
-                                onSelect={(currentValue) => {
-                                  form.setValue("merchantName", currentValue === field.value ? "" : currentValue);
-                                  form.setValue("merchantLocation", merchant.location || "");
+                                value={merchant.name} 
+                                onSelect={(selectedValueFromItem) => { 
+                                  form.setValue("merchantName", selectedValueFromItem);
+                                  const selectedMerchantData = merchants.find(m => m.name.toLowerCase() === selectedValueFromItem.toLowerCase());
+                                  form.setValue("merchantLocation", selectedMerchantData?.location || "");
                                   setComboboxOpen(false);
                                 }}
                               >
@@ -280,7 +278,7 @@ export function PurchaseForm() {
                     Ubicación del Comercio (Opcional)
                   </FormLabel>
                   <FormControl>
-                    <Input placeholder="Ej: Av. Siempre Viva 742" {...field} />
+                    <Input placeholder="Ej: Av. Siempre Viva 742" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -301,6 +299,7 @@ export function PurchaseForm() {
                       placeholder="Ej: Almuerzo con equipo, Cena aniversario..."
                       className="resize-none"
                       {...field}
+                      value={field.value || ''}
                     />
                   </FormControl>
                   <FormMessage />
@@ -311,7 +310,7 @@ export function PurchaseForm() {
             <FormField
               control={form.control}
               name="receiptImage"
-              render={({ field }) => (
+              render={({ field }) => ( 
                 <FormItem>
                   <FormLabel>Imagen del Recibo (Opcional)</FormLabel>
                   <FormControl>
@@ -325,6 +324,7 @@ export function PurchaseForm() {
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             accept="image/png, image/jpeg, image/webp"
                             onChange={handleFileChange}
+                            ref={field.ref} 
                           />
                         </div>
                       </Button>
@@ -365,3 +365,5 @@ export function PurchaseForm() {
     </Card>
   );
 }
+
+    
