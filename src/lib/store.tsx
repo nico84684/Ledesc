@@ -3,13 +3,16 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, startOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
+import { ToastAction } from "@/components/ui/toast";
+
 
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
@@ -26,11 +29,12 @@ const AppDispatchContext = createContext<AppDispatchContextType | undefined>(und
 
 const LOCAL_STORAGE_KEY = 'ledescAppState';
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
+const BACKUP_PROMPT_DISMISSED_TODAY_KEY = 'backupPromptDismissedToday';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
 
   const [state, setState] = useState<AppState>({
     purchases: [],
@@ -43,7 +47,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (storedState) {
       try {
-        const parsedState = JSON.parse(storedState);
+        const parsedState = JSON.parse(storedState) as AppState;
+        // Asegurar que los settings por defecto se apliquen si no están en el estado guardado
+        const currentSettings = { ...DEFAULT_BENEFIT_SETTINGS, ...parsedState.settings };
+        
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
           date: p.date,
@@ -54,10 +61,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
           name: m.name,
           location: m.location,
         }));
-        setState(parsedState);
+        setState({ ...parsedState, settings: currentSettings });
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
+        setState(prevState => ({...prevState, settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings }}));
       }
+    } else {
+      // Si no hay estado guardado, asegurarse de que los settings por defecto se usen completamente
+      setState(prevState => ({...prevState, settings: DEFAULT_BENEFIT_SETTINGS}));
     }
     setIsInitialized(true);
   }, []);
@@ -78,24 +89,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addMerchantInternal = useCallback((merchantName: string, merchantLocationParam: string | undefined, currentState: AppState): {
     updatedMerchants: Merchant[],
     newMerchant?: Merchant,
-    alreadyExists: boolean
+    alreadyExists: boolean,
+    updatedExistingMerchant?: Merchant
   } => {
     const trimmedName = merchantName.trim();
-    const normalizedLocation = (merchantLocationParam || '').trim();
+    const normalizedLocation = (merchantLocationParam || '').trim().toLowerCase();
+    const nameKey = trimmedName.toLowerCase();
 
     const existingMerchantIndex = currentState.merchants.findIndex(
-      (m) => m.name.toLowerCase() === trimmedName.toLowerCase() &&
-             (m.location || '').toLowerCase() === normalizedLocation.toLowerCase()
+        (m) => m.name.toLowerCase() === nameKey &&
+               (m.location || '').toLowerCase() === normalizedLocation
     );
 
     if (existingMerchantIndex > -1) {
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
+    
+    // Si existe un comercio con el mismo nombre pero diferente ubicación, o sin ubicación, y se provee una nueva ubicación
+    const sameNameMerchantIndex = currentState.merchants.findIndex(m => m.name.toLowerCase() === nameKey && !(m.location || '').trim());
+    if (sameNameMerchantIndex > -1 && normalizedLocation) {
+        // Actualizar la ubicación del comercio existente si no tenía una y se proporciona una
+        const updatedMerchants = [...currentState.merchants];
+        const merchantToUpdate = { ...updatedMerchants[sameNameMerchantIndex], location: merchantLocationParam?.trim() || undefined };
+        updatedMerchants[sameNameMerchantIndex] = merchantToUpdate;
+        return { updatedMerchants: updatedMerchants.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')), updatedExistingMerchant: merchantToUpdate, alreadyExists: false };
+    }
+
 
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
       name: trimmedName,
-      location: normalizedLocation || undefined,
+      location: merchantLocationParam?.trim() || undefined,
     };
     return {
       updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')),
@@ -112,7 +136,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: purchaseData.amount,
         date: purchaseData.date,
         merchantName: purchaseData.merchantName,
-        merchantLocation: purchaseData.merchantLocation, // Guardar la ubicación de la compra
+        merchantLocation: purchaseData.merchantLocation,
         description: purchaseData.description || undefined,
         receiptImageUrl: purchaseData.receiptImageUrl,
         id: new Date().toISOString() + Math.random().toString(),
@@ -124,13 +148,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
+        updatedExistingMerchant: updatedMerchantFromPurchase,
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
-
+      
       if (addedMerchantFromPurchase) {
         setTimeout(() => {
            toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido.`});
         }, 0);
+      } else if (updatedExistingMerchantFromPurchase) {
+         setTimeout(() => {
+           toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchantFromPurchase.name}" a "${updatedExistingMerchantFromPurchase.location}".`});
+        }, 0);
       }
+
 
       const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM');
       const spentThisMonth = updatedPurchases
@@ -248,6 +278,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       XLSX.writeFile(wb, `LEDESC_Backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
       
+      setState(prevState => ({
+        ...prevState,
+        settings: {
+          ...prevState.settings,
+          lastBackupTimestamp: Date.now(),
+        }
+      }));
+      
       setTimeout(() => {
         toast({ title: "Backup Exitoso", description: "Los datos se han exportado a un archivo Excel." });
       }, 0);
@@ -281,9 +319,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const merchantsFromExcel: any[] = XLSX.utils.sheet_to_json(wsMerchants);
 
         const restoredPurchases: Purchase[] = purchasesFromExcel.map((p: any, index: number) => {
-          let purchaseDate = new Date().toISOString(); // Default date
+          let purchaseDate = new Date().toISOString(); 
           if (p.Fecha) {
-            const parsedDate = p.Fecha instanceof Date ? p.Fecha : parseISO(p.Fecha as string);
+            const parsedDate = p.Fecha instanceof Date ? p.Fecha : parseISO(String(p.Fecha));
             if (isValid(parsedDate)) {
               purchaseDate = parsedDate.toISOString();
             } else {
@@ -294,11 +332,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }
           
           return {
-            id: p.ID || `restored_purchase_${Date.now()}_${index}`,
+            id: String(p.ID || `restored_purchase_${Date.now()}_${index}`),
             amount: typeof p['Monto Original'] === 'number' ? p['Monto Original'] : 0,
             date: purchaseDate,
             merchantName: String(p.Comercio || 'Desconocido'),
-            merchantLocation: String(p['Ubicación Comercio'] || ''),
+            merchantLocation: String(p['Ubicación Comercio'] || undefined),
             description: String(p.Descripción || ''),
             receiptImageUrl: String(p['URL Recibo'] || ''),
             discountApplied: typeof p['Descuento Aplicado'] === 'number' ? p['Descuento Aplicado'] : 0,
@@ -307,16 +345,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
 
         const restoredMerchants: Merchant[] = merchantsFromExcel.map((m: any, index: number) => ({
-          id: m.ID || `restored_merchant_${Date.now()}_${index}`,
+          id: String(m.ID || `restored_merchant_${Date.now()}_${index}`),
           name: String(m.Nombre || 'Desconocido'),
-          location: String(m.Ubicación || ''),
+          location: String(m.Ubicación || undefined),
         }));
         
-        // Validar que los datos restaurados sean arrays
         if (!Array.isArray(restoredPurchases) || !Array.isArray(restoredMerchants)) {
             throw new Error("Los datos leídos del Excel no tienen el formato esperado (no son arrays).");
         }
-
 
         setState(prevState => ({
           ...prevState,
@@ -343,6 +379,58 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     reader.readAsArrayBuffer(file);
   }, [toast]);
+
+  // Efecto para el recordatorio de backup diario
+  useEffect(() => {
+    if (!isInitialized || !state.settings.preferredBackupTime) {
+      return;
+    }
+
+    const backupPromptDismissedToday = localStorage.getItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY);
+    const todayStr = startOfDay(new Date()).toISOString();
+
+    if (backupPromptDismissedToday === todayStr) {
+      return; // Ya se descartó el prompt hoy
+    }
+
+    const now = new Date();
+    const [hours, minutes] = state.settings.preferredBackupTime.split(':').map(Number);
+    const preferredBackupDateTimeToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+    
+    const lastBackupTimestamp = state.settings.lastBackupTimestamp || 0;
+    const lastBackupDate = new Date(lastBackupTimestamp);
+
+    const backupIsDueToday = !(
+      lastBackupDate.getFullYear() === now.getFullYear() &&
+      lastBackupDate.getMonth() === now.getMonth() &&
+      lastBackupDate.getDate() === now.getDate()
+    );
+
+    if (backupIsDueToday && now >= preferredBackupDateTimeToday) {
+      const toastId = `backup-reminder-${Date.now()}`;
+      const handlePromptedBackup = () => {
+        backupToExcel();
+        dismiss(toastId); 
+        localStorage.setItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY, todayStr);
+      };
+      const handleDismissPrompt = () => {
+        dismiss(toastId);
+        localStorage.setItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY, todayStr);
+      }
+
+      setTimeout(() => { // Envolver en setTimeout para evitar errores de renderizado
+        toast({
+          id: toastId,
+          title: "Recordatorio de Backup Diario",
+          description: `Es hora de tu backup diario programado (${state.settings.preferredBackupTime}). ¿Deseas realizarlo ahora?`,
+          action: <ToastAction altText="Backup ahora" onClick={handlePromptedBackup}>Backup ahora</ToastAction>,
+          duration: Infinity, // Para que el usuario deba interactuar
+          onDismiss: handleDismissPrompt, // Si el usuario cierra el toast manualmente
+          onAutoClose: handleDismissPrompt, // Si se cierra automáticamente (aunque duration sea Infinity)
+        });
+      },0);
+    }
+  }, [isInitialized, state.settings, toast, backupToExcel, dismiss]);
 
 
   return (

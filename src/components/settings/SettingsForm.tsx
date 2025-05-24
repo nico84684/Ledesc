@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -28,6 +28,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
@@ -44,7 +46,10 @@ export function SettingsForm() {
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
-    defaultValues: settings,
+    defaultValues: {
+      ...settings,
+      preferredBackupTime: settings?.preferredBackupTime || '', // Asegurar que sea un string vacío si es undefined
+    },
   });
   
   useEffect(() => {
@@ -52,7 +57,10 @@ export function SettingsForm() {
       const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
       setIsInitialSetup(!setupComplete);
       if (settings) {
-        form.reset(settings);
+        form.reset({
+          ...settings,
+          preferredBackupTime: settings.preferredBackupTime || '',
+        });
       }
     }
   }, [settings, form, isInitialized]);
@@ -62,7 +70,10 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
-      const result = await updateSettingsAction(data);
+      const result = await updateSettingsAction({
+        ...data,
+        preferredBackupTime: data.preferredBackupTime === '' ? undefined : data.preferredBackupTime,
+      });
       if (result.success && result.settings) {
         updateSettingsInStore(result.settings);
 
@@ -118,7 +129,7 @@ export function SettingsForm() {
       } finally {
         setIsRestoring(false);
          if(fileInputRef.current) {
-           fileInputRef.current.value = ""; // Reset file input
+           fileInputRef.current.value = ""; 
          }
       }
     }
@@ -132,6 +143,10 @@ export function SettingsForm() {
       </div>
     );
   }
+  
+  const lastBackupInfo = settings.lastBackupTimestamp && settings.lastBackupTimestamp > 0
+    ? `Último backup: ${format(new Date(settings.lastBackupTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
+    : "Nunca se ha realizado un backup.";
 
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg">
@@ -145,79 +160,105 @@ export function SettingsForm() {
       </CardHeader>
       <CardContent className="space-y-6">
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="monthlyAllowance"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Beneficio Mensual Total ($)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="Ej: 50000" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                  </FormControl>
-                  <FormDescription>Monto total disponible cada mes.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <div className="space-y-6">
+              <FormField
+                control={form.control}
+                name="monthlyAllowance"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Beneficio Mensual Total ($)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                    </FormControl>
+                    <FormDescription>Monto total disponible cada mes.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="discountPercentage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Porcentaje de Descuento (%)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="Ej: 15" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                  </FormControl>
-                  <FormDescription>Descuento a aplicar en cada compra.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="discountPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Porcentaje de Descuento (%)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                    </FormControl>
+                    <FormDescription>Descuento a aplicar en cada compra.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            <FormField
-              control={form.control}
-              name="alertThresholdPercentage"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Umbral de Alerta de Límite (%)</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                  </FormControl>
-                  <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription>
-                  <FormMessage />
-                </FormItem>
+              <FormField
+                control={form.control}
+                name="alertThresholdPercentage"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Umbral de Alerta de Límite (%)</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
+                    </FormControl>
+                    <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              
+              <FormField
+                control={form.control}
+                name="enableWeeklyReminders"
+                render={({ field }) => (
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Recordatorios Semanales</FormLabel>
+                      <FormDescription>
+                        Recibir un recordatorio si no se usa el beneficio. (Función simulada)
+                      </FormDescription>
+                    </div>
+                    <FormControl>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        aria-label="Activar recordatorios semanales"
+                      />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+              {form.getValues("enableWeeklyReminders") && (
+                <div className="flex items-center p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
+                  <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
+                  <span>Los recordatorios semanales son una funcionalidad simulada y no enviarán notificaciones reales en esta versión.</span>
+                </div>
               )}
-            />
-            
-            <FormField
-              control={form.control}
-              name="enableWeeklyReminders"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                  <div className="space-y-0.5">
-                    <FormLabel className="text-base">Recordatorios Semanales</FormLabel>
+
+              <FormField
+                control={form.control}
+                name="preferredBackupTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center">
+                      <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
+                      Hora Preferida para Recordatorio de Backup Diario
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="time" 
+                        {...field}
+                        value={field.value || ''} // Asegurar que el valor no sea undefined
+                      />
+                    </FormControl>
                     <FormDescription>
-                      Recibir un recordatorio si no se usa el beneficio. (Función en desarrollo)
+                      Si la app está abierta, se te recordará hacer un backup si ha pasado esta hora. Deja vacío para no programar recordatorios.
                     </FormDescription>
-                  </div>
-                  <FormControl>
-                    <Switch
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      aria-label="Activar recordatorios semanales"
-                    />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
-             {form.getValues("enableWeeklyReminders") && (
-              <div className="flex items-center p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
-                <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                <span>Los recordatorios semanales son una funcionalidad simulada y no enviarán notificaciones reales en esta versión.</span>
-              </div>
-            )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (
@@ -234,6 +275,7 @@ export function SettingsForm() {
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Gestión de Datos</h3>
+          <p className="text-sm text-muted-foreground">{lastBackupInfo}</p>
           
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
@@ -241,7 +283,7 @@ export function SettingsForm() {
             </p>
             <Button onClick={handleExcelBackup} className="w-full" variant="outline">
               <FileDown className="mr-2 h-4 w-4" />
-              Backup a Excel
+              Backup a Excel Ahora
             </Button>
           </div>
 
