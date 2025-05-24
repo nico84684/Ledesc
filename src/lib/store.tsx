@@ -7,14 +7,14 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Importar parseISO si no está ya
 import { useRouter, usePathname } from 'next/navigation';
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
 const AppDispatchContext = createContext<{
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => void;
   updateSettings: (newSettings: BenefitSettings) => void;
-  addMerchant: (merchantName: string) => { success: boolean; merchant?: Merchant; message?: string };
+  addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
   isInitialized: boolean;
 } | undefined>(undefined);
@@ -30,22 +30,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     purchases: [],
     settings: DEFAULT_BENEFIT_SETTINGS,
-    merchants: [], // Inicializar lista de comercios
+    merchants: [],
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // Effect for loading from localStorage (runs once on mount)
   useEffect(() => {
     const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState);
+        // Asegurar que las fechas de las compras se parseen correctamente si vienen de JSON
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
-          date: p.date,
+          date: p.date, // Las fechas ya deberían estar en formato ISO string
         }));
-        // Asegurar que merchants sea un array, incluso si no estaba en el estado guardado previo
         parsedState.merchants = parsedState.merchants || [];
+        // Asegurar que los comercios tengan la propiedad location (puede ser undefined si son antiguos)
+        parsedState.merchants = parsedState.merchants.map((m: Merchant) => ({
+          id: m.id,
+          name: m.name,
+          location: m.location, // Conserva la ubicación si existe, sino será undefined
+        }));
         setState(parsedState);
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
@@ -54,7 +59,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setIsInitialized(true);
   }, []);
 
-  // Effect for saving state to localStorage and handling initial setup redirect
   useEffect(() => {
     if (isInitialized) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
@@ -68,19 +72,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state, isInitialized, router, pathname]);
 
-  const addMerchantInternal = useCallback((merchantName: string, currentState: AppState): { updatedMerchants: Merchant[], newMerchant?: Merchant, alreadyExists: boolean } => {
+  const addMerchantInternal = useCallback((merchantName: string, merchantLocation: string | undefined, currentState: AppState): { updatedMerchants: Merchant[], newMerchant?: Merchant, alreadyExists: boolean } => {
     const trimmedName = merchantName.trim();
     const existingMerchant = currentState.merchants.find(
       (m) => m.name.toLowerCase() === trimmedName.toLowerCase()
     );
 
     if (existingMerchant) {
+      // Si el comercio existe y se proporciona una nueva ubicación, actualizarla (opcional)
+      // Por ahora, solo devolvemos que ya existe sin modificarlo.
+      // Podríamos añadir lógica aquí para actualizar la ubicación si cambia.
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
 
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
       name: trimmedName,
+      location: merchantLocation?.trim() || undefined,
     };
     return { updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name)), newMerchant, alreadyExists: false };
   }, []);
@@ -98,18 +106,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
 
-      // Añadir comercio si es nuevo
-      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, prevState);
+      // Añadir comercio si es nuevo. Ahora no se pasa ubicación desde aquí.
+      // La ubicación del comercio se gestiona desde la página de Comercios.
+      // O, si se quisiera, se podría añadir un campo de ubicación en el form de compra.
+      // Por simplicidad, al añadir desde una compra, no se le asigna ubicación al comercio.
+      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, undefined, prevState);
       if (addedMerchantFromPurchase) {
-         toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista de adheridos.`});
+         toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista. Puede añadirle una ubicación desde la sección Comercios.`});
       }
       
-      const currentMonth = format(new Date(), 'yyyy-MM');
+      const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM'); // Usar parseISO aquí
       const spentThisMonth = updatedPurchases
-        .filter(p => format(new Date(p.date), 'yyyy-MM') === currentMonth)
+        .filter(p => format(parseISO(p.date), 'yyyy-MM') === currentMonth) // Y aquí
         .reduce((sum, p) => sum + p.finalAmount, 0);
       
-      const usagePercentage = (spentThisMonth / prevState.settings.monthlyAllowance) * 100;
+      const usagePercentage = (prevState.settings.monthlyAllowance > 0) ? (spentThisMonth / prevState.settings.monthlyAllowance) * 100 : 0;
 
       if (prevState.settings.monthlyAllowance > 0 && usagePercentage >= prevState.settings.alertThresholdPercentage) {
         toast({
@@ -127,13 +138,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setState(prevState => ({ ...prevState, settings: newSettings }));
   }, []);
 
-  const addMerchant = useCallback((merchantName: string): { success: boolean; merchant?: Merchant; message?: string } => {
+  const addMerchant = useCallback((merchantName: string, merchantLocation?: string): { success: boolean; merchant?: Merchant; message?: string } => {
     let result: { success: boolean; merchant?: Merchant; message?: string } = { success: false };
     setState(prevState => {
-      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, prevState);
+      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, merchantLocation, prevState);
       if (alreadyExists) {
         result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe.` };
-        return prevState;
+        return prevState; // No cambiar el estado si ya existe
       }
       if (newMerchant) {
         result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" añadido exitosamente.` };
@@ -154,21 +165,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state.purchases.map(p => [
         p.id,
         p.amount,
-        format(new Date(p.date), 'yyyy-MM-dd'),
-        `"${p.merchantName.replace(/"/g, '""')}"`,
-        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`,
+        format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'), // Usar parseISO para la fecha
+        `"${p.merchantName.replace(/"/g, '""')}"`, // Escapar comillas dobles en el nombre
+        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, // Escapar comillas dobles
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''
       ].join(','))
     ];
     const csvString = csvRows.join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // Añadir BOM para Excel
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `ledesc_transacciones_${format(new Date(), 'yyyyMMdd')}.csv`);
+      link.setAttribute('download', `ledesc_transacciones_${format(new Date(), 'yyyyMMdd_HHmmss')}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();

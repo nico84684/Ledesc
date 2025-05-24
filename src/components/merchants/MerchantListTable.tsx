@@ -7,22 +7,24 @@ import type { Merchant } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Store, Search, Info } from 'lucide-react';
+import { Store, Search, Info, MapPin } from 'lucide-react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useAppDispatch } from '@/lib/store';
+import { Button } from '@/components/ui/button'; // Import Button
 
 const ITEMS_PER_PAGE = 10;
 
 export function MerchantListTable() {
   const { merchants } = useAppState();
-  const { isInitialized } = useAppDispatch(); // Para saber si el store está listo
+  const { isInitialized } = useAppDispatch(); 
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
 
   const filteredMerchants = useMemo(() => {
     return merchants.filter(merchant =>
-      merchant.name.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a,b) => a.name.localeCompare(b.name)); // Asegurar orden alfabético
+      merchant.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (merchant.location && merchant.location.toLowerCase().includes(searchTerm.toLowerCase()))
+    ).sort((a,b) => a.name.localeCompare(b.name)); 
   }, [merchants, searchTerm]);
 
   const paginatedMerchants = useMemo(() => {
@@ -65,7 +67,7 @@ export function MerchantListTable() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
-            placeholder="Buscar comercio por nombre..."
+            placeholder="Buscar por nombre o ubicación..."
             value={searchTerm}
             onChange={e => {
               setSearchTerm(e.target.value);
@@ -93,6 +95,7 @@ export function MerchantListTable() {
                 <TableRow>
                   <TableHead className="w-[100px]">ID (Interno)</TableHead>
                   <TableHead>Nombre del Comercio</TableHead>
+                  <TableHead>Ubicación</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -102,6 +105,16 @@ export function MerchantListTable() {
                       {merchant.id.substring(0, 8)}...
                     </TableCell>
                     <TableCell className="font-medium">{merchant.name}</TableCell>
+                    <TableCell>
+                      {merchant.location ? (
+                        <span className="flex items-center">
+                          <MapPin className="mr-1 h-4 w-4 text-muted-foreground" />
+                          {merchant.location}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

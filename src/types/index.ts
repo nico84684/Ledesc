@@ -20,11 +20,11 @@ export interface BenefitSettings {
 export interface Merchant {
   id: string;
   name: string;
-  // Podríamos añadir más campos en el futuro, como dirección, categoría, etc.
+  location?: string; // Nueva propiedad opcional para la ubicación
 }
 
 export interface AppState {
   purchases: Purchase[];
   settings: BenefitSettings;
-  merchants: Merchant[]; // Nueva lista de comercios
+  merchants: Merchant[];
 }

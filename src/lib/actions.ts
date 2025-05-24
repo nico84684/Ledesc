@@ -14,6 +14,8 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
   
   let receiptImageUrl: string | undefined = undefined;
   if (data.receiptImage && data.receiptImage.size > 0) {
+    // En una app real, aquí subirías la imagen a un storage (ej. Firebase Storage)
+    // y obtendrías la URL. Para este prototipo, usamos un placeholder.
     receiptImageUrl = `https://placehold.co/300x200.png?text=Recibo&font=roboto`;
   }
 
@@ -22,7 +24,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
     id: new Date().toISOString() + Math.random().toString(),
     amount: data.amount,
     date: data.date, 
-    merchantName: data.merchantName.trim(), // Trim merchant name
+    merchantName: data.merchantName.trim(),
     description: data.description || undefined,
     receiptImageUrl,
     discountApplied: parseFloat(discountAmount.toFixed(2)),
@@ -31,7 +33,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
   
   revalidatePath('/');
   revalidatePath('/history');
-  revalidatePath('/merchants'); // Revalidar merchants page
+  revalidatePath('/merchants'); 
   
   return { success: true, message: "Compra registrada exitosamente.", purchase: newPurchase };
 }
@@ -58,15 +60,11 @@ export async function addManualMerchantAction(data: AddMerchantFormData): Promis
   const newMerchant: Merchant = {
     id: new Date().toISOString() + Math.random().toString(),
     name: data.name.trim(),
+    location: data.location?.trim() || undefined, // Guardar ubicación si se proporciona
   };
-
-  // En una app real: await db.insertMerchant(newMerchant) y verificar duplicados en DB.
-  // Aquí, la verificación de duplicados y la adición al estado se harán en el cliente (store).
 
   revalidatePath('/merchants');
 
-  // Devolvemos el merchant para que el cliente lo pueda usar para actualizar el store,
-  // pero el store será el que realmente decida si lo añade o no (por si ya existe).
   return { success: true, message: `Solicitud para añadir "${newMerchant.name}" procesada.`, merchant: newMerchant };
 }
 
@@ -79,9 +77,11 @@ export async function backupToGoogleDriveAction(appData: AppState): Promise<Back
     return { success: false, message: "Error: Datos de la aplicación incompletos para el backup." };
   }
 
+  // Convertir el estado de la aplicación al formato esperado por el flujo
   const flowInput: BackupDataInput = {
     purchases: appData.purchases,
     settings: appData.settings,
+    // merchants: appData.merchants, // Si el flujo necesitara comercios
   };
 
   try {

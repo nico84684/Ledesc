@@ -26,6 +26,7 @@ export type SettingsFormData = z.infer<typeof SettingsFormSchema>;
 
 export const AddMerchantFormSchema = z.object({
   name: z.string().min(1, "El nombre del comercio es requerido.").max(100, "El nombre del comercio no puede exceder los 100 caracteres."),
+  location: z.string().max(150, "La ubicación no puede exceder los 150 caracteres.").optional(),
 });
 
 export type AddMerchantFormData = z.infer<typeof AddMerchantFormSchema>;

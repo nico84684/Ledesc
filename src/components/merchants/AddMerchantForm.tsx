@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, PlusCircle, Building2 } from 'lucide-react';
+import { Loader2, PlusCircle, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export function AddMerchantForm() {
@@ -23,18 +23,17 @@ export function AddMerchantForm() {
     resolver: zodResolver(AddMerchantFormSchema),
     defaultValues: {
       name: '',
+      location: '',
     },
   });
 
   async function onSubmit(data: AddMerchantFormData) {
     setIsSubmitting(true);
     try {
-      // Llamar a la acción del servidor (que actualmente solo simula)
       const actionResult = await addManualMerchantAction(data);
 
       if (actionResult.success && actionResult.merchant) {
-        // Intentar añadir al store del cliente, el store maneja duplicados
-        const storeResult = addMerchantToStore(actionResult.merchant.name);
+        const storeResult = addMerchantToStore(actionResult.merchant.name, actionResult.merchant.location);
         if (storeResult.success && storeResult.merchant) {
           toast({ title: "Éxito", description: `Comercio "${storeResult.merchant.name}" añadido.` });
           form.reset();
@@ -71,6 +70,22 @@ export function AddMerchantForm() {
                   <FormLabel>Nombre del Comercio</FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: Café Martínez Central" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                    <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                    Ubicación (Opcional)
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Av. Corrientes 1234, CABA" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
