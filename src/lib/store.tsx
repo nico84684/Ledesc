@@ -105,29 +105,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
-
-      // Añadir comercio si es nuevo. Ahora no se pasa ubicación desde aquí.
-      // La ubicación del comercio se gestiona desde la página de Comercios.
-      // O, si se quisiera, se podría añadir un campo de ubicación en el form de compra.
-      // Por simplicidad, al añadir desde una compra, no se le asigna ubicación al comercio.
+      
       const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, undefined, prevState);
+      
       if (addedMerchantFromPurchase) {
-         toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista. Puede añadirle una ubicación desde la sección Comercios.`});
+        setTimeout(() => {
+          toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista. Puede añadirle una ubicación desde la sección Comercios.`});
+        }, 0);
       }
       
-      const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM'); // Usar parseISO aquí
+      const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM'); 
       const spentThisMonth = updatedPurchases
-        .filter(p => format(parseISO(p.date), 'yyyy-MM') === currentMonth) // Y aquí
+        .filter(p => format(parseISO(p.date), 'yyyy-MM') === currentMonth) 
         .reduce((sum, p) => sum + p.finalAmount, 0);
       
       const usagePercentage = (prevState.settings.monthlyAllowance > 0) ? (spentThisMonth / prevState.settings.monthlyAllowance) * 100 : 0;
 
       if (prevState.settings.monthlyAllowance > 0 && usagePercentage >= prevState.settings.alertThresholdPercentage) {
-        toast({
-          title: "Alerta de Límite de Beneficio",
-          description: `Has utilizado ${usagePercentage.toFixed(0)}% de tu beneficio mensual.`,
-          variant: "destructive",
-        });
+        setTimeout(() => {
+          toast({
+            title: "Alerta de Límite de Beneficio",
+            description: `Has utilizado ${usagePercentage.toFixed(0)}% de tu beneficio mensual.`,
+            variant: "destructive",
+          });
+        }, 0);
       }
       
       return { ...prevState, purchases: updatedPurchases, merchants: merchantsAfterPurchase };
@@ -165,16 +166,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state.purchases.map(p => [
         p.id,
         p.amount,
-        format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'), // Usar parseISO para la fecha
-        `"${p.merchantName.replace(/"/g, '""')}"`, // Escapar comillas dobles en el nombre
-        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, // Escapar comillas dobles
+        format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'), 
+        `"${p.merchantName.replace(/"/g, '""')}"`, 
+        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, 
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''
       ].join(','))
     ];
     const csvString = csvRows.join('\n');
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); // Añadir BOM para Excel
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); 
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
