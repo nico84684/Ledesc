@@ -4,7 +4,7 @@
 
 import type { ReactNode } from 'react';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { Purchase, BenefitSettings, AppState } from '@/types';
+import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -14,6 +14,7 @@ const AppStateContext = createContext<AppState | undefined>(undefined);
 const AppDispatchContext = createContext<{
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => void;
   updateSettings: (newSettings: BenefitSettings) => void;
+  addMerchant: (merchantName: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
   isInitialized: boolean;
 } | undefined>(undefined);
@@ -29,6 +30,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>({
     purchases: [],
     settings: DEFAULT_BENEFIT_SETTINGS,
+    merchants: [], // Inicializar lista de comercios
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -42,10 +44,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...p,
           date: p.date,
         }));
+        // Asegurar que merchants sea un array, incluso si no estaba en el estado guardado previo
+        parsedState.merchants = parsedState.merchants || [];
         setState(parsedState);
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
-        // Potentially reset to defaults or clear corrupted storage
       }
     }
     setIsInitialized(true);
@@ -56,7 +59,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isInitialized) {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
 
-      // Check for initial setup after isInitialized is true and router/pathname are available
       if (router && pathname) {
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
         if (!setupComplete && pathname !== '/settings') {
@@ -66,17 +68,41 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state, isInitialized, router, pathname]);
 
+  const addMerchantInternal = useCallback((merchantName: string, currentState: AppState): { updatedMerchants: Merchant[], newMerchant?: Merchant, alreadyExists: boolean } => {
+    const trimmedName = merchantName.trim();
+    const existingMerchant = currentState.merchants.find(
+      (m) => m.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existingMerchant) {
+      return { updatedMerchants: currentState.merchants, alreadyExists: true };
+    }
+
+    const newMerchant: Merchant = {
+      id: new Date().toISOString() + Math.random().toString(),
+      name: trimmedName,
+    };
+    return { updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name)), newMerchant, alreadyExists: false };
+  }, []);
+
+
   const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => {
     setState(prevState => {
       const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
       const newPurchase: Purchase = {
         ...purchaseData,
         id: new Date().toISOString() + Math.random().toString(),
-        description: purchaseData.description || undefined, // Ensure description is handled
+        description: purchaseData.description || undefined,
         discountApplied: parseFloat(discountAmount.toFixed(2)),
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
+
+      // Añadir comercio si es nuevo
+      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, prevState);
+      if (addedMerchantFromPurchase) {
+         toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista de adheridos.`});
+      }
       
       const currentMonth = format(new Date(), 'yyyy-MM');
       const spentThisMonth = updatedPurchases
@@ -93,13 +119,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
         });
       }
       
-      return { ...prevState, purchases: updatedPurchases };
+      return { ...prevState, purchases: updatedPurchases, merchants: merchantsAfterPurchase };
     });
-  }, [toast]);
+  }, [toast, addMerchantInternal]);
 
   const updateSettings = useCallback((newSettings: BenefitSettings) => {
     setState(prevState => ({ ...prevState, settings: newSettings }));
   }, []);
+
+  const addMerchant = useCallback((merchantName: string): { success: boolean; merchant?: Merchant; message?: string } => {
+    let result: { success: boolean; merchant?: Merchant; message?: string } = { success: false };
+    setState(prevState => {
+      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, prevState);
+      if (alreadyExists) {
+        result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe.` };
+        return prevState;
+      }
+      if (newMerchant) {
+        result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" añadido exitosamente.` };
+      }
+      return { ...prevState, merchants: updatedMerchants };
+    });
+    return result;
+  }, [addMerchantInternal]);
   
   const exportToCSV = useCallback(() => {
     if (state.purchases.length === 0) {
@@ -114,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         p.amount,
         format(new Date(p.date), 'yyyy-MM-dd'),
         `"${p.merchantName.replace(/"/g, '""')}"`,
-        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, // Add description to CSV
+        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`,
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''
@@ -139,7 +181,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, exportToCSV, isInitialized }}>
+      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized }}>
         {children}
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>

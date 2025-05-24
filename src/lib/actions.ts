@@ -4,45 +4,34 @@
 // In a real application, these would interact with a database.
 "use server";
 
-import type { PurchaseFormData, SettingsFormData } from '@/lib/schemas';
-import type { Purchase, BenefitSettings, AppState } from '@/types';
+import type { PurchaseFormData, SettingsFormData, AddMerchantFormData } from '@/lib/schemas';
+import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { backupDataToDrive, type BackupDataInput, type BackupDataOutput } from '@/ai/flows/backup-data-flow';
-
-// Note: Since server actions can't directly call client-side context,
-// the actual state update will happen on the client after the action resolves.
-// This simulation works by having the client call its context update methods.
-// A real app would have these actions update a DB, and client would refetch or use optimistic updates.
 
 export async function addPurchaseAction(data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
   console.log("Server Action: addPurchaseAction called with data:", data);
   
-  // Simulate image upload if a file is present
   let receiptImageUrl: string | undefined = undefined;
   if (data.receiptImage && data.receiptImage.size > 0) {
-    // In a real app, upload to cloud storage and get URL
-    // For simulation, use a placeholder or a data URL (if small enough, but not recommended for real use)
-    receiptImageUrl = `https://placehold.co/300x200.png?text=Recibo&font=roboto`; // Simple placeholder
+    receiptImageUrl = `https://placehold.co/300x200.png?text=Recibo&font=roboto`;
   }
 
   const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
   const newPurchase: Purchase = {
-    id: new Date().toISOString() + Math.random().toString(), // Temporary ID
+    id: new Date().toISOString() + Math.random().toString(),
     amount: data.amount,
-    date: data.date, // Assuming date is already ISO string from form
-    merchantName: data.merchantName,
-    description: data.description || undefined, // Add description
+    date: data.date, 
+    merchantName: data.merchantName.trim(), // Trim merchant name
+    description: data.description || undefined,
     receiptImageUrl,
     discountApplied: parseFloat(discountAmount.toFixed(2)),
     finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
   };
-
-  // In a real app: await db.insertPurchase(newPurchase);
-  // For simulation, the client will handle adding this to its state.
-  // We return the processed purchase data.
   
   revalidatePath('/');
   revalidatePath('/history');
+  revalidatePath('/merchants'); // Revalidar merchants page
   
   return { success: true, message: "Compra registrada exitosamente.", purchase: newPurchase };
 }
@@ -57,14 +46,30 @@ export async function updateSettingsAction(data: SettingsFormData): Promise<{ su
     enableWeeklyReminders: data.enableWeeklyReminders,
   };
 
-  // In a real app: await db.updateUserSettings(newSettings);
-  // For simulation, client will handle updating its state.
-
   revalidatePath('/');
   revalidatePath('/settings');
 
   return { success: true, message: "Configuración actualizada exitosamente.", settings: newSettings };
 }
+
+export async function addManualMerchantAction(data: AddMerchantFormData): Promise<{ success: boolean; message: string; merchant?: Merchant }> {
+  console.log("Server Action: addManualMerchantAction called with data:", data);
+
+  const newMerchant: Merchant = {
+    id: new Date().toISOString() + Math.random().toString(),
+    name: data.name.trim(),
+  };
+
+  // En una app real: await db.insertMerchant(newMerchant) y verificar duplicados en DB.
+  // Aquí, la verificación de duplicados y la adición al estado se harán en el cliente (store).
+
+  revalidatePath('/merchants');
+
+  // Devolvemos el merchant para que el cliente lo pueda usar para actualizar el store,
+  // pero el store será el que realmente decida si lo añade o no (por si ya existe).
+  return { success: true, message: `Solicitud para añadir "${newMerchant.name}" procesada.`, merchant: newMerchant };
+}
+
 
 export async function backupToGoogleDriveAction(appData: AppState): Promise<BackupDataOutput> {
   console.log("Server Action: backupToGoogleDriveAction llamada. Se invocará el flujo de Genkit.");
@@ -80,7 +85,6 @@ export async function backupToGoogleDriveAction(appData: AppState): Promise<Back
   };
 
   try {
-    // Llamar al flujo de Genkit
     const result = await backupDataToDrive(flowInput);
     console.log("Resultado del flujo de Genkit backupDataToDrive:", result);
     return result;

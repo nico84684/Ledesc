@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, History, Settings as SettingsIcon, PlusCircle } from 'lucide-react';
+import { Home, History, Settings as SettingsIcon, PlusCircle, Store } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SidebarMenu,
@@ -18,6 +18,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/add-purchase', label: 'Registrar Compra', icon: PlusCircle },
   { href: '/history', label: 'Historial', icon: History },
+  { href: '/merchants', label: 'Comercios', icon: Store }, // Nuevo ítem
   { href: '/settings', label: 'Configuración', icon: SettingsIcon },
 ];
 
@@ -42,7 +43,7 @@ export function SidebarNav() {
               height={32} 
               priority 
               data-ai-hint="logo abstract"
-              className="h-8 w-8" // Asegura consistencia con props width/height
+              className="h-8 w-8"
             />
             <span 
               style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }} 
@@ -78,11 +79,6 @@ export function SidebarNav() {
           ))}
         </SidebarMenu>
       </div>
-      {/* Optional: Sidebar Footer */}
-      {/* <div className="mt-auto p-4 border-t border-sidebar-border">
-        <p className="text-xs text-sidebar-muted-foreground">© {new Date().getFullYear()} {APP_NAME}</p>
-      </div> */}
     </nav>
   );
 }
-

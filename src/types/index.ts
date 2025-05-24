@@ -17,7 +17,14 @@ export interface BenefitSettings {
   enableWeeklyReminders: boolean;
 }
 
+export interface Merchant {
+  id: string;
+  name: string;
+  // Podríamos añadir más campos en el futuro, como dirección, categoría, etc.
+}
+
 export interface AppState {
   purchases: Purchase[];
   settings: BenefitSettings;
+  merchants: Merchant[]; // Nueva lista de comercios
 }
