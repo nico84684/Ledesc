@@ -5,6 +5,7 @@ export const PurchaseFormSchema = z.object({
   amount: z.coerce.number().min(0.01, "El monto debe ser mayor a 0."),
   date: z.string().min(1, "La fecha es requerida."),
   merchantName: z.string().min(1, "El nombre del comercio es requerido.").max(100, "El nombre del comercio no puede exceder los 100 caracteres."),
+  merchantLocation: z.string().max(150, "La ubicación del comercio no puede exceder los 150 caracteres.").optional(), // Nuevo campo
   description: z.string().max(250, "La descripción no puede exceder los 250 caracteres.").optional(),
   receiptImage: z.custom<File | undefined>()
     .refine(file => file === undefined || file.size <= 5 * 1024 * 1024, `El tamaño máximo del archivo es 5MB.`)

@@ -9,12 +9,12 @@ import { addPurchaseAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText } from 'lucide-react';
+import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -36,7 +36,8 @@ export function PurchaseForm() {
       amount: '' as unknown as number, 
       date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), 
       merchantName: '',
-      description: '', // Initialize description
+      merchantLocation: '', // Inicializar merchantLocation
+      description: '',
       receiptImage: undefined,
     },
   });
@@ -60,13 +61,14 @@ export function PurchaseForm() {
     try {
       const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
       
-      const result = await addPurchaseAction(data, settings);
+      const result = await addPurchaseAction(data, settings); // data ya incluye merchantLocation
 
       if (result.success && result.purchase) {
-        addPurchaseToStore({
+        addPurchaseToStore({ // Pasar merchantLocation a addPurchaseToStore
           amount: result.purchase.amount,
           date: result.purchase.date, 
           merchantName: result.purchase.merchantName,
+          merchantLocation: data.merchantLocation, // Añadir merchantLocation aquí
           description: result.purchase.description,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
@@ -75,7 +77,8 @@ export function PurchaseForm() {
           amount: '' as unknown as number, 
           date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
           merchantName: '',
-          description: '', // Reset description
+          merchantLocation: '', // Resetear merchantLocation
+          description: '',
           receiptImage: undefined,
         });
         setSelectedFileName(null);
@@ -190,12 +193,29 @@ export function PurchaseForm() {
 
             <FormField
               control={form.control}
+              name="merchantLocation"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center">
+                     <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                    Ubicación del Comercio (Opcional)
+                  </FormLabel>
+                  <FormControl>
+                    <Input placeholder="Ej: Av. Siempre Viva 742" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="description"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center">
                     <MessageSquareText className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Descripción (Opcional)
+                    Descripción de la Compra (Opcional)
                   </FormLabel>
                   <FormControl>
                     <Textarea

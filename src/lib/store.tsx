@@ -7,17 +7,20 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns'; // Importar parseISO si no está ya
+import { format, parseISO } from 'date-fns';
 import { useRouter, usePathname } from 'next/navigation';
 
-const AppStateContext = createContext<AppState | undefined>(undefined);
-const AppDispatchContext = createContext<{
-  addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => void;
+// Extender la firma de addPurchase para incluir merchantLocation
+interface AppDispatchContextType {
+  addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
   updateSettings: (newSettings: BenefitSettings) => void;
   addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
   isInitialized: boolean;
-} | undefined>(undefined);
+}
+
+const AppStateContext = createContext<AppState | undefined>(undefined);
+const AppDispatchContext = createContext<AppDispatchContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'ledescAppState';
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
@@ -39,17 +42,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState);
-        // Asegurar que las fechas de las compras se parseen correctamente si vienen de JSON
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
-          date: p.date, // Las fechas ya deberían estar en formato ISO string
+          date: p.date, 
         }));
         parsedState.merchants = parsedState.merchants || [];
-        // Asegurar que los comercios tengan la propiedad location (puede ser undefined si son antiguos)
         parsedState.merchants = parsedState.merchants.map((m: Merchant) => ({
           id: m.id,
           name: m.name,
-          location: m.location, // Conserva la ubicación si existe, sino será undefined
+          location: m.location, 
         }));
         setState(parsedState);
       } catch (error) {
@@ -79,9 +80,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 
     if (existingMerchant) {
-      // Si el comercio existe y se proporciona una nueva ubicación, actualizarla (opcional)
-      // Por ahora, solo devolvemos que ya existe sin modificarlo.
-      // Podríamos añadir lógica aquí para actualizar la ubicación si cambia.
+      // Si el comercio existe y no tiene ubicación, pero se proporciona una ahora, podríamos actualizarlo.
+      // Por simplicidad, si existe, no lo actualizamos con la ubicación de la compra.
+      // El usuario puede añadir la ubicación desde la pantalla de Comercios si lo desea.
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
 
@@ -94,23 +95,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
 
-  const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => {
+  const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => {
     setState(prevState => {
       const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
       const newPurchase: Purchase = {
-        ...purchaseData,
-        id: new Date().toISOString() + Math.random().toString(),
+        amount: purchaseData.amount,
+        date: purchaseData.date,
+        merchantName: purchaseData.merchantName,
         description: purchaseData.description || undefined,
+        receiptImageUrl: purchaseData.receiptImageUrl,
+        id: new Date().toISOString() + Math.random().toString(),
         discountApplied: parseFloat(discountAmount.toFixed(2)),
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
       
-      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, undefined, prevState);
+      // Usar la merchantLocation de purchaseData para el nuevo comercio
+      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
       
       if (addedMerchantFromPurchase) {
         setTimeout(() => {
-          toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ha sido añadido a la lista. Puede añadirle una ubicación desde la sección Comercios.`});
+           toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido a la lista.`});
         }, 0);
       }
       
@@ -122,7 +127,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const usagePercentage = (prevState.settings.monthlyAllowance > 0) ? (spentThisMonth / prevState.settings.monthlyAllowance) * 100 : 0;
 
       if (prevState.settings.monthlyAllowance > 0 && usagePercentage >= prevState.settings.alertThresholdPercentage) {
-        setTimeout(() => {
+         setTimeout(() => {
           toast({
             title: "Alerta de Límite de Beneficio",
             description: `Has utilizado ${usagePercentage.toFixed(0)}% de tu beneficio mensual.`,
@@ -145,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, merchantLocation, prevState);
       if (alreadyExists) {
         result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe.` };
-        return prevState; // No cambiar el estado si ya existe
+        return prevState; 
       }
       if (newMerchant) {
         result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" añadido exitosamente.` };
