@@ -73,25 +73,45 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state, isInitialized, router, pathname]);
 
-  const addMerchantInternal = useCallback((merchantName: string, merchantLocation: string | undefined, currentState: AppState): { updatedMerchants: Merchant[], newMerchant?: Merchant, alreadyExists: boolean } => {
+  const addMerchantInternal = useCallback((merchantName: string, merchantLocation: string | undefined, currentState: AppState): { 
+    updatedMerchants: Merchant[], 
+    newMerchant?: Merchant, 
+    updatedExistingMerchant?: Merchant, 
+    alreadyExistsAndNoUpdate: boolean 
+  } => {
     const trimmedName = merchantName.trim();
-    const existingMerchant = currentState.merchants.find(
+    const existingMerchantIndex = currentState.merchants.findIndex(
       (m) => m.name.toLowerCase() === trimmedName.toLowerCase()
     );
 
-    if (existingMerchant) {
-      // Si el comercio existe y no tiene ubicación, pero se proporciona una ahora, podríamos actualizarlo.
-      // Por simplicidad, si existe, no lo actualizamos con la ubicación de la compra.
-      // El usuario puede añadir la ubicación desde la pantalla de Comercios si lo desea.
-      return { updatedMerchants: currentState.merchants, alreadyExists: true };
+    if (existingMerchantIndex > -1) {
+      const merchantsCopy = [...currentState.merchants];
+      const existingMerchant = merchantsCopy[existingMerchantIndex];
+      
+      // Si el comercio existe y se proporciona una nueva ubicación Y el comercio existente NO tenía ubicación, actualízala.
+      if (merchantLocation && merchantLocation.trim() && !existingMerchant.location) {
+        existingMerchant.location = merchantLocation.trim();
+        return { 
+          updatedMerchants: merchantsCopy.sort((a, b) => a.name.localeCompare(b.name)), 
+          updatedExistingMerchant: existingMerchant, 
+          alreadyExistsAndNoUpdate: false 
+        };
+      }
+      // Si ya existe y tiene ubicación, o no se proporciona nueva ubicación válida, o se proporciona la misma, no se hace nada.
+      return { updatedMerchants: currentState.merchants, alreadyExistsAndNoUpdate: true };
     }
 
+    // Si no existe, crear nuevo
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
       name: trimmedName,
       location: merchantLocation?.trim() || undefined,
     };
-    return { updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name)), newMerchant, alreadyExists: false };
+    return { 
+      updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name)), 
+      newMerchant, 
+      alreadyExistsAndNoUpdate: false 
+    };
   }, []);
 
 
@@ -110,12 +130,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
       
-      // Usar la merchantLocation de purchaseData para el nuevo comercio
-      const { updatedMerchants: merchantsAfterPurchase, newMerchant: addedMerchantFromPurchase } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
+      const { 
+        updatedMerchants: merchantsAfterPurchase, 
+        newMerchant: addedMerchantFromPurchase,
+        updatedExistingMerchant: updatedMerchantLocation
+      } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
       
       if (addedMerchantFromPurchase) {
         setTimeout(() => {
            toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido a la lista.`});
+        }, 0);
+      } else if (updatedMerchantLocation) {
+         setTimeout(() => {
+           toast({ title: "Ubicación de Comercio Actualizada", description: `Se añadió/actualizó la ubicación a "${updatedMerchantLocation.location}" para el comercio "${updatedMerchantLocation.name}".`});
         }, 0);
       }
       
@@ -147,22 +174,30 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addMerchant = useCallback((merchantName: string, merchantLocation?: string): { success: boolean; merchant?: Merchant; message?: string } => {
     let result: { success: boolean; merchant?: Merchant; message?: string } = { success: false };
     setState(prevState => {
-      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, merchantLocation, prevState);
-      if (alreadyExists) {
-        result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe.` };
-        return prevState; 
-      }
+      const { updatedMerchants, newMerchant, alreadyExistsAndNoUpdate, updatedExistingMerchant } = addMerchantInternal(merchantName, merchantLocation, prevState);
+      
       if (newMerchant) {
         result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" añadido exitosamente.` };
+         return { ...prevState, merchants: updatedMerchants };
+      } else if (updatedExistingMerchant) {
+         result = { success: true, merchant: updatedExistingMerchant, message: `Ubicación actualizada para "${updatedExistingMerchant.name}".` };
+         return { ...prevState, merchants: updatedMerchants };
+      } else if (alreadyExistsAndNoUpdate) {
+        result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe y no se proporcionó una nueva ubicación o ya tenía una.` };
+        return prevState; 
       }
-      return { ...prevState, merchants: updatedMerchants };
+      // Should not reach here if logic is correct, but as a fallback
+      result = { success: false, message: 'No se pudo procesar la solicitud del comercio.'}
+      return prevState;
     });
     return result;
   }, [addMerchantInternal]);
   
   const exportToCSV = useCallback(() => {
     if (state.purchases.length === 0) {
-      toast({ title: "Sin Datos", description: "No hay transacciones para exportar.", variant: "default"});
+      setTimeout(() => {
+        toast({ title: "Sin Datos", description: "No hay transacciones para exportar.", variant: "default"});
+      },0);
       return;
     }
     const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
@@ -190,9 +225,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast({ title: "Exportación Exitosa", description: "Los datos se han exportado a CSV."});
+      setTimeout(() => {
+        toast({ title: "Exportación Exitosa", description: "Los datos se han exportado a CSV."});
+      },0);
     } else {
-      toast({ title: "Error de Exportación", description: "Tu navegador no soporta la descarga directa.", variant: "destructive"});
+      setTimeout(() => {
+        toast({ title: "Error de Exportación", description: "Tu navegador no soporta la descarga directa.", variant: "destructive"});
+      },0);
     }
   }, [state.purchases, toast]);
 

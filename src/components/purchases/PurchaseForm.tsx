@@ -14,29 +14,32 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText, MapPin } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText, MapPin, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import Image from 'next/image';
+import type { Merchant } from '@/types';
 
 export function PurchaseForm() {
   const { addPurchase: addPurchaseToStore } = useAppDispatch();
-  const { settings } = useAppState();
+  const { settings, merchants } = useAppState(); // Obtener merchants del estado
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
     defaultValues: {
-      amount: '' as unknown as number, 
-      date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"), 
+      amount: '' as unknown as number,
+      date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
       merchantName: '',
-      merchantLocation: '', // Inicializar merchantLocation
+      merchantLocation: '',
       description: '',
       receiptImage: undefined,
     },
@@ -47,37 +50,41 @@ export function PurchaseForm() {
     if (file) {
       setSelectedFileName(file.name);
       setPreviewUrl(URL.createObjectURL(file));
-      form.setValue('receiptImage', file); 
+      form.setValue('receiptImage', file);
     } else {
       setSelectedFileName(null);
       setPreviewUrl(null);
       form.setValue('receiptImage', undefined);
     }
   };
-  
+
   async function onSubmit(data: PurchaseFormData) {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
     try {
       const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-      
-      const result = await addPurchaseAction(data, settings); // data ya incluye merchantLocation
+
+      const result = await addPurchaseAction(data, settings);
 
       if (result.success && result.purchase) {
-        addPurchaseToStore({ // Pasar merchantLocation a addPurchaseToStore
+        addPurchaseToStore({
           amount: result.purchase.amount,
-          date: result.purchase.date, 
+          date: result.purchase.date,
           merchantName: result.purchase.merchantName,
-          merchantLocation: data.merchantLocation, // Añadir merchantLocation aquí
+          merchantLocation: data.merchantLocation, // Pasar la ubicación del formulario
           description: result.purchase.description,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
-        toast({ title: "Éxito", description: result.message, variant: 'default' });
+        
+        setTimeout(() => {
+          toast({ title: "Éxito", description: result.message, variant: 'default' });
+        }, 0);
+
         form.reset({
-          amount: '' as unknown as number, 
+          amount: '' as unknown as number,
           date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
           merchantName: '',
-          merchantLocation: '', // Resetear merchantLocation
+          merchantLocation: '',
           description: '',
           receiptImage: undefined,
         });
@@ -85,17 +92,21 @@ export function PurchaseForm() {
         setPreviewUrl(null);
         setSubmissionStatus('success');
       } else {
-        toast({ title: "Error", description: result.message, variant: 'destructive' });
+         setTimeout(() => {
+          toast({ title: "Error", description: result.message, variant: 'destructive' });
+        }, 0);
         setSubmissionStatus('error');
       }
     } catch (error) {
-      toast({ title: "Error Inesperado", description: "Ocurrió un error al registrar la compra.", variant: 'destructive' });
+       setTimeout(() => {
+        toast({ title: "Error Inesperado", description: "Ocurrió un error al registrar la compra.", variant: 'destructive' });
+      }, 0);
       setSubmissionStatus('error');
     } finally {
       setIsSubmitting(false);
     }
   }
-  
+
   useEffect(() => {
     if (submissionStatus === 'success' || submissionStatus === 'error') {
       const timer = setTimeout(() => setSubmissionStatus('idle'), 3000);
@@ -120,12 +131,12 @@ export function PurchaseForm() {
                 <FormItem>
                   <FormLabel>Monto Total ($)</FormLabel>
                   <FormControl>
-                    <Input 
-                      type="number" 
-                      placeholder="Ej: 2500.50" 
-                      {...field} 
-                      step="0.01" 
-                      value={field.value === undefined || field.value === null ? '' : field.value} 
+                    <Input
+                      type="number"
+                      placeholder="Ej: 2500.50"
+                      {...field}
+                      step="0.01"
+                      value={field.value === undefined || field.value === null ? '' : String(field.value)}
                       onChange={e => field.onChange(e.target.value === '' ? '' : parseFloat(e.target.value))}
                     />
                   </FormControl>
@@ -181,11 +192,79 @@ export function PurchaseForm() {
               control={form.control}
               name="merchantName"
               render={({ field }) => (
-                <FormItem>
+                <FormItem className="flex flex-col">
                   <FormLabel>Nombre del Comercio</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Ej: Restaurante El Sabor" {...field} />
-                  </FormControl>
+                  <Popover open={comboboxOpen} onOpenChange={setComboboxOpen}>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={comboboxOpen}
+                          className={cn(
+                            "w-full justify-between",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value
+                            ? merchants.find(
+                                (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase()
+                              )?.name ?? field.value
+                            : "Seleccionar o escribir comercio..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                      <Command shouldFilter={false} // Desactivar filtro interno de Command, ya que tenemos Input
+                      > 
+                        <CommandInput
+                          placeholder="Buscar comercio o añadir nuevo..."
+                          value={field.value}
+                          onValueChange={(currentValue) => {
+                            field.onChange(currentValue); // Actualiza el valor del formulario
+                            // Si el valor escrito coincide con un comercio existente, autocompletar ubicación
+                            const matchedMerchant = merchants.find(m => m.name.toLowerCase() === currentValue.toLowerCase());
+                            if (matchedMerchant) {
+                                form.setValue('merchantLocation', matchedMerchant.location || '');
+                            } else {
+                                // Opcional: limpiar ubicación si no coincide con ningún comercio,
+                                // o dejar que el usuario la escriba.
+                                // form.setValue('merchantLocation', ''); 
+                            }
+                          }}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            {field.value ? `"${field.value}" se registrará como nuevo.` : "No se encontraron comercios. Escribe para añadir uno nuevo."}
+                          </CommandEmpty>
+                          <CommandGroup>
+                            {merchants.map((merchant: Merchant) => (
+                              <CommandItem
+                                key={merchant.id}
+                                value={merchant.name}
+                                onSelect={(currentValue) => {
+                                  form.setValue("merchantName", currentValue === field.value ? "" : currentValue);
+                                  form.setValue("merchantLocation", merchant.location || "");
+                                  setComboboxOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    field.value && field.value.toLowerCase() === merchant.name.toLowerCase()
+                                      ? "opacity-100"
+                                      : "opacity-0"
+                                  )}
+                                />
+                                {merchant.name}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )}
@@ -197,7 +276,7 @@ export function PurchaseForm() {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel className="flex items-center">
-                     <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
                     Ubicación del Comercio (Opcional)
                   </FormLabel>
                   <FormControl>
@@ -228,11 +307,11 @@ export function PurchaseForm() {
                 </FormItem>
               )}
             />
-            
+
             <FormField
               control={form.control}
               name="receiptImage"
-              render={({ field }) => ( 
+              render={({ field }) => (
                 <FormItem>
                   <FormLabel>Imagen del Recibo (Opcional)</FormLabel>
                   <FormControl>
@@ -241,8 +320,8 @@ export function PurchaseForm() {
                         <div>
                           <ImageIcon className="mr-2 h-4 w-4" />
                           {selectedFileName ? 'Cambiar archivo' : 'Subir archivo'}
-                          <input 
-                            type="file" 
+                          <input
+                            type="file"
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             accept="image/png, image/jpeg, image/webp"
                             onChange={handleFileChange}
@@ -273,13 +352,13 @@ export function PurchaseForm() {
           </form>
         </Form>
       </CardContent>
-       {submissionStatus === 'success' && (
+      {submissionStatus === 'success' && (
         <CardFooter>
           <p className="text-sm text-green-600">Compra registrada exitosamente.</p>
         </CardFooter>
       )}
       {submissionStatus === 'error' && (
-         <CardFooter>
+        <CardFooter>
           <p className="text-sm text-destructive">Error al registrar la compra. Inténtalo de nuevo.</p>
         </CardFooter>
       )}
