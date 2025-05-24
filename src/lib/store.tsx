@@ -3,20 +3,22 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { useRouter, usePathname } from 'next/navigation';
+import * as XLSX from 'xlsx';
 
-// Extender la firma de addPurchase para incluir merchantLocation
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
   updateSettings: (newSettings: BenefitSettings) => void;
   addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
   isInitialized: boolean;
+  backupToExcel: () => void;
+  restoreFromExcel: (file: File) => void;
 }
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
@@ -79,7 +81,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     alreadyExists: boolean
   } => {
     const trimmedName = merchantName.trim();
-    // Normalize location: treat undefined, null, or empty string as an empty string for comparison and storage.
     const normalizedLocation = (merchantLocationParam || '').trim();
 
     const existingMerchantIndex = currentState.merchants.findIndex(
@@ -88,15 +89,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
 
     if (existingMerchantIndex > -1) {
-      // Comercio con mismo nombre y misma ubicación ya existe
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
 
-    // Si no existe la combinación nombre+ubicación, crear nuevo
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
       name: trimmedName,
-      location: normalizedLocation || undefined, // Guardar undefined si la ubicación normalizada es vacía
+      location: normalizedLocation || undefined,
     };
     return {
       updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')),
@@ -113,6 +112,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: purchaseData.amount,
         date: purchaseData.date,
         merchantName: purchaseData.merchantName,
+        merchantLocation: purchaseData.merchantLocation, // Guardar la ubicación de la compra
         description: purchaseData.description || undefined,
         receiptImageUrl: purchaseData.receiptImageUrl,
         id: new Date().toISOString() + Math.random().toString(),
@@ -124,16 +124,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
-        alreadyExists,
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
 
       if (addedMerchantFromPurchase) {
         setTimeout(() => {
            toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido.`});
         }, 0);
-      } else if (alreadyExists) {
-        // Opcional: podrías dar un toast informando que el comercio ya existía y no se añadió de nuevo.
-        // Por ahora, no hacemos nada para no saturar con toasts.
       }
 
       const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM');
@@ -174,7 +170,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         result = { success: false, message: `El comercio "${merchantName.trim()}" ${locationMsg} ya existe.` };
         return prevState;
       }
-      // Fallback, no debería llegar aquí
       result = { success: false, message: 'No se pudo procesar la solicitud del comercio.'}
       return prevState;
     });
@@ -188,7 +183,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },0);
       return;
     }
-    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
+    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Ubicación Comercio", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
     const csvRows = [
       headers.join(','),
       ...state.purchases.map(p => [
@@ -196,6 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         p.amount,
         format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
         `"${p.merchantName.replace(/"/g, '""')}"`,
+        `"${p.merchantLocation ? p.merchantLocation.replace(/"/g, '""') : ''}"`,
         `"${p.description ? p.description.replace(/"/g, '""') : ''}"`,
         p.discountApplied,
         p.finalAmount,
@@ -223,9 +219,135 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.purchases, toast]);
 
+  const backupToExcel = useCallback(() => {
+    try {
+      const purchasesForExcel = state.purchases.map(p => ({
+        ID: p.id,
+        'Monto Original': p.amount,
+        Fecha: format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
+        Comercio: p.merchantName,
+        'Ubicación Comercio': p.merchantLocation || '',
+        Descripción: p.description || '',
+        'URL Recibo': p.receiptImageUrl || '',
+        'Descuento Aplicado': p.discountApplied,
+        'Monto Final': p.finalAmount,
+      }));
+
+      const merchantsForExcel = state.merchants.map(m => ({
+        ID: m.id,
+        Nombre: m.name,
+        Ubicación: m.location || '',
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const wsPurchases = XLSX.utils.json_to_sheet(purchasesForExcel);
+      const wsMerchants = XLSX.utils.json_to_sheet(merchantsForExcel);
+
+      XLSX.utils.book_append_sheet(wb, wsPurchases, "Compras");
+      XLSX.utils.book_append_sheet(wb, wsMerchants, "Comercios");
+
+      XLSX.writeFile(wb, `LEDESC_Backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
+      
+      setTimeout(() => {
+        toast({ title: "Backup Exitoso", description: "Los datos se han exportado a un archivo Excel." });
+      }, 0);
+
+    } catch (error) {
+      console.error("Error al generar backup Excel:", error);
+      setTimeout(() => {
+        toast({ title: "Error de Backup", description: "No se pudo generar el archivo Excel.", variant: "destructive" });
+      }, 0);
+    }
+  }, [state.purchases, state.merchants, toast]);
+
+  const restoreFromExcel = useCallback((file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          throw new Error("No se pudieron leer los datos del archivo.");
+        }
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+
+        if (!wb.SheetNames.includes("Compras") || !wb.SheetNames.includes("Comercios")) {
+          throw new Error("El archivo Excel no contiene las hojas 'Compras' y 'Comercios' requeridas.");
+        }
+
+        const wsPurchases = wb.Sheets["Compras"];
+        const wsMerchants = wb.Sheets["Comercios"];
+
+        const purchasesFromExcel: any[] = XLSX.utils.sheet_to_json(wsPurchases);
+        const merchantsFromExcel: any[] = XLSX.utils.sheet_to_json(wsMerchants);
+
+        const restoredPurchases: Purchase[] = purchasesFromExcel.map((p: any, index: number) => {
+          let purchaseDate = new Date().toISOString(); // Default date
+          if (p.Fecha) {
+            const parsedDate = p.Fecha instanceof Date ? p.Fecha : parseISO(p.Fecha as string);
+            if (isValid(parsedDate)) {
+              purchaseDate = parsedDate.toISOString();
+            } else {
+               console.warn(`Fila ${index+2} (Compras): Fecha inválida "${p.Fecha}", se usará fecha actual.`);
+            }
+          } else {
+            console.warn(`Fila ${index+2} (Compras): Fecha no encontrada, se usará fecha actual.`);
+          }
+          
+          return {
+            id: p.ID || `restored_purchase_${Date.now()}_${index}`,
+            amount: typeof p['Monto Original'] === 'number' ? p['Monto Original'] : 0,
+            date: purchaseDate,
+            merchantName: String(p.Comercio || 'Desconocido'),
+            merchantLocation: String(p['Ubicación Comercio'] || ''),
+            description: String(p.Descripción || ''),
+            receiptImageUrl: String(p['URL Recibo'] || ''),
+            discountApplied: typeof p['Descuento Aplicado'] === 'number' ? p['Descuento Aplicado'] : 0,
+            finalAmount: typeof p['Monto Final'] === 'number' ? p['Monto Final'] : 0,
+          };
+        });
+
+        const restoredMerchants: Merchant[] = merchantsFromExcel.map((m: any, index: number) => ({
+          id: m.ID || `restored_merchant_${Date.now()}_${index}`,
+          name: String(m.Nombre || 'Desconocido'),
+          location: String(m.Ubicación || ''),
+        }));
+        
+        // Validar que los datos restaurados sean arrays
+        if (!Array.isArray(restoredPurchases) || !Array.isArray(restoredMerchants)) {
+            throw new Error("Los datos leídos del Excel no tienen el formato esperado (no son arrays).");
+        }
+
+
+        setState(prevState => ({
+          ...prevState,
+          purchases: restoredPurchases,
+          merchants: restoredMerchants,
+        }));
+
+        setTimeout(() => {
+          toast({ title: "Restauración Exitosa", description: "Los datos se han restaurado desde el archivo Excel. Los datos anteriores han sido reemplazados." });
+        }, 0);
+
+      } catch (error: any) {
+        console.error("Error al restaurar desde Excel:", error);
+        setTimeout(() => {
+          toast({ title: "Error de Restauración", description: `No se pudo restaurar desde el archivo: ${error.message}`, variant: "destructive" });
+        }, 0);
+      }
+    };
+    reader.onerror = (error) => {
+        console.error("Error al leer el archivo:", error);
+        setTimeout(() => {
+          toast({ title: "Error de Lectura", description: "No se pudo leer el archivo seleccionado.", variant: "destructive" });
+        }, 0);
+    };
+    reader.readAsArrayBuffer(file);
+  }, [toast]);
+
+
   return (
     <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized }}>
+      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel }}>
         {children}
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>

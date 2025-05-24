@@ -11,23 +11,36 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, CloudUpload } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useRouter } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
 export function SettingsForm() {
   const { settings, purchases } = useAppState(); 
-  const { updateSettings: updateSettingsInStore, isInitialized } = useAppDispatch();
+  const { updateSettings: updateSettingsInStore, isInitialized, backupToExcel, restoreFromExcel: restoreFromExcelStore } = useAppDispatch();
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [isInitialSetup, setIsInitialSetup] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
@@ -55,7 +68,7 @@ export function SettingsForm() {
 
         if (wasInitialSetupPending) {
           localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
-          setIsInitialSetup(false); // Update state to reflect setup is complete
+          setIsInitialSetup(false); 
           toast({
             title: "¡Configuración Guardada!",
             description: "Tu beneficio ha sido configurado. Serás redirigido al dashboard.",
@@ -74,22 +87,42 @@ export function SettingsForm() {
     }
   }
 
-  async function handleBackup() {
+  async function handleGoogleDriveBackup() {
     setIsBackingUp(true);
     try {
-      // Pass current purchases and settings to the action
       const result = await backupToGoogleDriveAction({ purchases, settings });
       if (result.success) {
-        toast({ title: "Backup (Simulación)", description: result.message });
+        toast({ title: "Backup (Simulación Google Drive)", description: result.message });
       } else {
-        toast({ title: "Error de Backup (Simulación)", description: result.message, variant: 'destructive' });
+        toast({ title: "Error de Backup (Simulación Google Drive)", description: result.message, variant: 'destructive' });
       }
     } catch (error) {
-      toast({ title: "Error Inesperado", description: "Ocurrió un error durante el backup (simulación).", variant: 'destructive' });
+      toast({ title: "Error Inesperado", description: "Ocurrió un error durante el backup (simulación Google Drive).", variant: 'destructive' });
     } finally {
       setIsBackingUp(false);
     }
   }
+
+  const handleExcelBackup = () => {
+    backupToExcel();
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setIsRestoring(true);
+      try {
+        restoreFromExcelStore(file);
+      } catch (error: any) {
+         toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
+      } finally {
+        setIsRestoring(false);
+         if(fileInputRef.current) {
+           fileInputRef.current.value = ""; // Reset file input
+         }
+      }
+    }
+  };
 
   if (!isInitialized) {
      return (
@@ -107,7 +140,7 @@ export function SettingsForm() {
           {isInitialSetup ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
         </CardTitle>
         <CardDescription>
-          {isInitialSetup ? "Por favor, establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico."}
+          {isInitialSetup ? "Por favor, establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico y gestiona tus datos."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -199,20 +232,82 @@ export function SettingsForm() {
         
         <Separator className="my-8" />
 
-        <div>
-          <h3 className="text-lg font-medium mb-2">Backup de Datos</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Realiza un backup (simulado) de tus compras y configuración en Google Drive.
-            La funcionalidad real de conexión con Google Drive requiere configuración adicional.
-          </p>
-          <Button onClick={handleBackup} className="w-full" variant="outline" disabled={isBackingUp}>
-            {isBackingUp ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <CloudUpload className="mr-2 h-4 w-4" />
-            )}
-            {isBackingUp ? 'Realizando Backup...' : 'Backup en Google Drive (Simulación)'}
-          </Button>
+        <div className="space-y-4">
+          <h3 className="text-lg font-medium">Gestión de Datos</h3>
+          
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Realiza un backup de tus compras y comercios en un archivo Excel.
+            </p>
+            <Button onClick={handleExcelBackup} className="w-full" variant="outline">
+              <FileDown className="mr-2 h-4 w-4" />
+              Backup a Excel
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Restaura tus datos desde un archivo Excel. Esto reemplazará todos los datos actuales.
+            </p>
+             <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button className="w-full" variant="outline" disabled={isRestoring}>
+                  {isRestoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+                  {isRestoring ? 'Restaurando...' : 'Restaurar desde Excel'}
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirmar Restauración de Datos</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Esta acción reemplazará todas tus compras y comercios actuales con los datos del archivo Excel seleccionado.
+                    ¿Estás seguro de que quieres continuar? Se recomienda hacer un backup primero.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => fileInputRef.current?.click()}>
+                    Continuar y Seleccionar Archivo
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleFileSelect} 
+              accept=".xlsx, .xls" 
+              className="hidden" 
+              disabled={isRestoring}
+            />
+          </div>
+           <div className="flex items-start p-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
+              <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-semibold">Nota sobre Excel:</span>
+                <ul className="list-disc list-inside pl-2 mt-1">
+                  <li>El archivo debe contener hojas llamadas "Compras" y "Comercios".</li>
+                  <li>Las columnas deben coincidir con el formato de backup (ID, Fecha, Monto Original, etc.).</li>
+                  <li>Las fechas en la hoja "Compras" deben estar en formato 'AAAA-MM-DD HH:MM:SS' o ser fechas válidas de Excel.</li>
+                </ul>
+              </div>
+            </div>
+
+
+          <Separator className="my-6" />
+          <div>
+            <p className="text-sm text-muted-foreground mb-2">
+              (Simulación) Realiza un backup de tus datos en Google Drive.
+            </p>
+            <Button onClick={handleGoogleDriveBackup} className="w-full" variant="outline" disabled={isBackingUp}>
+              {isBackingUp ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <CloudUpload className="mr-2 h-4 w-4" />
+              )}
+              {isBackingUp ? 'Realizando Backup...' : 'Backup en Google Drive (Simulación)'}
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
