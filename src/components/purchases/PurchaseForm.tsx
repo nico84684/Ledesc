@@ -36,7 +36,7 @@ export function PurchaseForm() {
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
     defaultValues: {
-      amount: '' as unknown as number, // Inicializar como string vacío para evitar error de uncontrolled/controlled
+      amount: '' as unknown as number,
       date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
       merchantName: '',
       merchantLocation: '',
@@ -62,9 +62,6 @@ export function PurchaseForm() {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
     try {
-      // La fecha ya está en formato ISO string desde el estado del formulario
-      // const dateToSend = typeof data.date === 'string' ? data.date : format(data.date as unknown as Date, "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
-
       const result = await addPurchaseAction(data, settings);
 
       if (result.success && result.purchase) {
@@ -72,7 +69,7 @@ export function PurchaseForm() {
           amount: result.purchase.amount,
           date: result.purchase.date,
           merchantName: result.purchase.merchantName,
-          merchantLocation: data.merchantLocation, 
+          merchantLocation: data.merchantLocation,
           description: result.purchase.description,
           receiptImageUrl: result.purchase.receiptImageUrl,
         });
@@ -207,28 +204,28 @@ export function PurchaseForm() {
                             !field.value && "text-muted-foreground"
                           )}
                         >
-                          {field.value
-                            ? merchants.find(
-                                (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase()
-                              )?.name ?? field.value 
-                            : "Seleccionar o escribir comercio..."}
+                          <span className="truncate">
+                            {field.value
+                              ? merchants.find(
+                                  (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase()
+                                )?.name ?? field.value 
+                              : "Seleccionar o escribir comercio..."}
+                          </span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <Command> 
+                      <Command>
                         <CommandInput
                           placeholder="Buscar o escribir nuevo..."
-                          value={field.value || ''} 
+                          value={field.value || ''}
                           onValueChange={(currentValue) => {
-                            field.onChange(currentValue); 
+                            field.onChange(currentValue);
                             const matchedMerchant = merchants.find(m => m.name.toLowerCase() === currentValue.toLowerCase());
                             if (matchedMerchant) {
                                 form.setValue('merchantLocation', matchedMerchant.location || '');
                             }
-                            // No limpiar merchantLocation si no hay match exacto, 
-                            // para permitir al usuario definirla si es un nuevo comercio.
                           }}
                         />
                         <CommandList>
@@ -239,11 +236,10 @@ export function PurchaseForm() {
                             {merchants.map((merchant: Merchant) => (
                               <CommandItem
                                 key={merchant.id}
-                                value={merchant.name} 
-                                onSelect={(selectedValueFromItem) => { 
-                                  form.setValue("merchantName", selectedValueFromItem);
-                                  const selectedMerchantData = merchants.find(m => m.name.toLowerCase() === selectedValueFromItem.toLowerCase());
-                                  form.setValue("merchantLocation", selectedMerchantData?.location || "");
+                                value={merchant.name}
+                                onSelect={() => {
+                                  form.setValue("merchantName", merchant.name);
+                                  form.setValue("merchantLocation", merchant.location || "");
                                   setComboboxOpen(false);
                                 }}
                               >
@@ -255,7 +251,15 @@ export function PurchaseForm() {
                                       : "opacity-0"
                                   )}
                                 />
-                                {merchant.name}
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{merchant.name}</span>
+                                  {merchant.location && (
+                                    <span className="text-xs text-muted-foreground ml-0">
+                                      <MapPin className="inline-block h-3 w-3 mr-1" />
+                                      {merchant.location}
+                                    </span>
+                                  )}
+                                </div>
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -365,5 +369,3 @@ export function PurchaseForm() {
     </Card>
   );
 }
-
-    
