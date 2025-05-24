@@ -16,18 +16,11 @@ export const PurchaseFormSchema = z.object({
 
 export type PurchaseFormData = z.infer<typeof PurchaseFormSchema>;
 
-const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/;
-
 export const SettingsFormSchema = z.object({
   monthlyAllowance: z.coerce.number().min(1, "El beneficio mensual debe ser mayor a 0."),
   discountPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo.").max(100, "El porcentaje no puede ser mayor a 100."),
   alertThresholdPercentage: z.coerce.number().min(0, "El umbral no puede ser negativo.").max(100, "El umbral no puede ser mayor a 100."),
   enableWeeklyReminders: z.boolean(),
-  preferredBackupTime: z.string()
-    .refine((time) => time === '' || timeRegex.test(time), {
-      message: "La hora debe estar en formato HH:mm o vacía.",
-    })
-    .optional(),
   lastBackupTimestamp: z.number().optional(), // Solo para lectura, no editable directamente
 });
 

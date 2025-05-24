@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle, Clock } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -28,13 +28,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
+interface CountersState {
+  newPurchasesCount: number;
+  newMerchantsCount: number;
+}
+
 export function SettingsForm() {
-  const { settings, purchases } = useAppState(); 
+  const { settings, purchases, merchants } = useAppState(); 
   const { updateSettings: updateSettingsInStore, isInitialized, backupToExcel, restoreFromExcel: restoreFromExcelStore } = useAppDispatch();
   const { toast } = useToast();
   const router = useRouter();
@@ -44,11 +49,15 @@ export function SettingsForm() {
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [counters, setCounters] = useState<CountersState>({
+    newPurchasesCount: 0,
+    newMerchantsCount: 0,
+  });
+
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
     defaultValues: {
       ...settings,
-      preferredBackupTime: settings?.preferredBackupTime || '', // Asegurar que sea un string vacío si es undefined
     },
   });
   
@@ -59,23 +68,54 @@ export function SettingsForm() {
       if (settings) {
         form.reset({
           ...settings,
-          preferredBackupTime: settings.preferredBackupTime || '',
         });
       }
     }
   }, [settings, form, isInitialized]);
+
+  useEffect(() => {
+    if (isInitialized && settings.lastBackupTimestamp !== undefined) {
+      const lastBackupTime = settings.lastBackupTimestamp || 0;
+      
+      const newPurchases = purchases.filter(p => {
+        try {
+          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime(); // ID format: 'timestampISO+random'
+          return purchaseTimestamp > lastBackupTime;
+        } catch (e) { return false; } // En caso de ID malformado
+      }).length;
+
+      const newMerchants = merchants.filter(m => {
+         try {
+          const merchantTimestamp = parseISO(m.id.split('+')[0]).getTime();
+          return merchantTimestamp > lastBackupTime;
+        } catch (e) { return false; }
+      }).length;
+      
+      setCounters({ newPurchasesCount: newPurchases, newMerchantsCount: newMerchants });
+    } else if (isInitialized && settings.lastBackupTimestamp === 0) {
+      // Si nunca se hizo backup, todos son nuevos
+      setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
+    }
+  }, [purchases, merchants, settings.lastBackupTimestamp, isInitialized]);
+
 
   async function onSubmit(data: SettingsFormData) {
     setIsSubmitting(true);
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
-      const result = await updateSettingsAction({
-        ...data,
-        preferredBackupTime: data.preferredBackupTime === '' ? undefined : data.preferredBackupTime,
-      });
+      // Solo enviar los campos que son parte del schema y no el lastBackupTimestamp
+      const dataToUpdate: Partial<BenefitSettings> = {
+        monthlyAllowance: data.monthlyAllowance,
+        discountPercentage: data.discountPercentage,
+        alertThresholdPercentage: data.alertThresholdPercentage,
+        enableWeeklyReminders: data.enableWeeklyReminders,
+      };
+      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); // Ajustar tipo si es necesario
       if (result.success && result.settings) {
-        updateSettingsInStore(result.settings);
+        // Asegurarse de que updateSettingsInStore actualice SOLO las settings, no el lastBackupTimestamp
+        updateSettingsInStore({ ...settings, ...result.settings });
+
 
         if (wasInitialSetupPending) {
           localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
@@ -101,7 +141,7 @@ export function SettingsForm() {
   async function handleGoogleDriveBackup() {
     setIsBackingUp(true);
     try {
-      const result = await backupToGoogleDriveAction({ purchases, settings });
+      const result = await backupToGoogleDriveAction({ purchases, settings, merchants }); // Incluir merchants si el flujo lo necesita
       if (result.success) {
         toast({ title: "Backup (Simulación Google Drive)", description: result.message });
       } else {
@@ -116,6 +156,7 @@ export function SettingsForm() {
 
   const handleExcelBackup = () => {
     backupToExcel();
+    // El timestamp se actualiza dentro de backupToExcel en el store, lo que disparará el useEffect de contadores
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -123,7 +164,7 @@ export function SettingsForm() {
     if (file) {
       setIsRestoring(true);
       try {
-        restoreFromExcelStore(file);
+        restoreFromExcelStore(file); // Esta función ahora debería actualizar lastBackupTimestamp en el store
       } catch (error: any) {
          toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
       } finally {
@@ -234,30 +275,6 @@ export function SettingsForm() {
                   <span>Los recordatorios semanales son una funcionalidad simulada y no enviarán notificaciones reales en esta versión.</span>
                 </div>
               )}
-
-              <FormField
-                control={form.control}
-                name="preferredBackupTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center">
-                      <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                      Hora Preferida para Recordatorio de Backup Diario
-                    </FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="time" 
-                        {...field}
-                        value={field.value || ''} // Asegurar que el valor no sea undefined
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Si la app está abierta, se te recordará hacer un backup si ha pasado esta hora. Deja vacío para no programar recordatorios.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
             </div>
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
@@ -275,7 +292,17 @@ export function SettingsForm() {
 
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Gestión de Datos</h3>
-          <p className="text-sm text-muted-foreground">{lastBackupInfo}</p>
+          <div className="p-3 border rounded-md bg-muted/50 text-sm">
+            <p className="mb-1">{lastBackupInfo}</p>
+            <div className="flex items-center">
+              <ShoppingCart className="h-4 w-4 mr-2 text-primary" /> 
+              <span>{counters.newPurchasesCount} compras nuevas desde el último backup.</span>
+            </div>
+            <div className="flex items-center mt-1">
+              <StoreIcon className="h-4 w-4 mr-2 text-primary" />
+              <span>{counters.newMerchantsCount} comercios nuevos desde el último backup.</span>
+            </div>
+          </div>
           
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">

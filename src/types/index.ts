@@ -16,7 +16,6 @@ export interface BenefitSettings {
   discountPercentage: number; // e.g., 15 for 15%
   alertThresholdPercentage: number; // e.g., 80 for 80%
   enableWeeklyReminders: boolean;
-  preferredBackupTime?: string; // HH:mm format, e.g., "14:30"
   lastBackupTimestamp?: number; // Milliseconds since epoch
 }
 

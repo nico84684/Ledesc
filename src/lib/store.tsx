@@ -16,7 +16,7 @@ import { ToastAction } from "@/components/ui/toast";
 
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
-  updateSettings: (newSettings: BenefitSettings) => void;
+  updateSettings: (newSettings: Partial<BenefitSettings>) => void;
   addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
   isInitialized: boolean;
@@ -29,7 +29,6 @@ const AppDispatchContext = createContext<AppDispatchContextType | undefined>(und
 
 const LOCAL_STORAGE_KEY = 'ledescAppState';
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
-const BACKUP_PROMPT_DISMISSED_TODAY_KEY = 'backupPromptDismissedToday';
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -49,7 +48,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
       try {
         const parsedState = JSON.parse(storedState) as AppState;
         // Asegurar que los settings por defecto se apliquen si no están en el estado guardado
-        const currentSettings = { ...DEFAULT_BENEFIT_SETTINGS, ...parsedState.settings };
+        // y que no se sobreescriba lastBackupTimestamp si ya existe.
+        const currentSettings = { 
+          ...DEFAULT_BENEFIT_SETTINGS, 
+          ...parsedState.settings,
+          lastBackupTimestamp: parsedState.settings.lastBackupTimestamp || DEFAULT_BENEFIT_SETTINGS.lastBackupTimestamp,
+        };
         
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
@@ -90,31 +94,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updatedMerchants: Merchant[],
     newMerchant?: Merchant,
     alreadyExists: boolean,
-    updatedExistingMerchant?: Merchant
+    updatedExistingMerchant?: Merchant // Ya no se usa para actualizar, solo para saber si se matcheo uno sin ubicacion
   } => {
     const trimmedName = merchantName.trim();
-    const normalizedLocation = (merchantLocationParam || '').trim().toLowerCase();
-    const nameKey = trimmedName.toLowerCase();
+    const normalizedNameKey = trimmedName.toLowerCase();
+    const normalizedLocationKey = (merchantLocationParam || '').trim().toLowerCase() || undefined; // Convertir "" a undefined
 
     const existingMerchantIndex = currentState.merchants.findIndex(
-        (m) => m.name.toLowerCase() === nameKey &&
-               (m.location || '').toLowerCase() === normalizedLocation
+        (m) => m.name.toLowerCase() === normalizedNameKey &&
+               ((m.location || '').toLowerCase() || undefined) === normalizedLocationKey
     );
 
     if (existingMerchantIndex > -1) {
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
     
-    // Si existe un comercio con el mismo nombre pero diferente ubicación, o sin ubicación, y se provee una nueva ubicación
-    const sameNameMerchantIndex = currentState.merchants.findIndex(m => m.name.toLowerCase() === nameKey && !(m.location || '').trim());
-    if (sameNameMerchantIndex > -1 && normalizedLocation) {
-        // Actualizar la ubicación del comercio existente si no tenía una y se proporciona una
-        const updatedMerchants = [...currentState.merchants];
-        const merchantToUpdate = { ...updatedMerchants[sameNameMerchantIndex], location: merchantLocationParam?.trim() || undefined };
-        updatedMerchants[sameNameMerchantIndex] = merchantToUpdate;
-        return { updatedMerchants: updatedMerchants.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')), updatedExistingMerchant: merchantToUpdate, alreadyExists: false };
-    }
+    // Si existe un comercio con el mismo nombre pero el existente NO tiene ubicación
+    // Y se está proveyendo una ubicación para el "nuevo" (que en realidad es el mismo sin ubicación)
+    if (normalizedLocationKey) {
+      const sameNameNoLocationMerchantIndex = currentState.merchants.findIndex(
+        m => m.name.toLowerCase() === normalizedNameKey && !((m.location || '').trim())
+      );
 
+      if (sameNameNoLocationMerchantIndex > -1) {
+        // Actualizar la ubicación del comercio existente que no tenía una.
+        const updatedMerchants = [...currentState.merchants];
+        const merchantToUpdate = { ...updatedMerchants[sameNameNoLocationMerchantIndex], location: merchantLocationParam?.trim() };
+        updatedMerchants[sameNameNoLocationMerchantIndex] = merchantToUpdate;
+        return { 
+          updatedMerchants: updatedMerchants.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')), 
+          updatedExistingMerchant: merchantToUpdate, // Indica que un comercio existente fue actualizado
+          alreadyExists: false // No es un duplicado exacto, sino una actualización
+        };
+      }
+    }
 
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
@@ -136,7 +149,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: purchaseData.amount,
         date: purchaseData.date,
         merchantName: purchaseData.merchantName,
-        merchantLocation: purchaseData.merchantLocation,
+        merchantLocation: purchaseData.merchantLocation, // Guardar la ubicación de la compra
         description: purchaseData.description || undefined,
         receiptImageUrl: purchaseData.receiptImageUrl,
         id: new Date().toISOString() + Math.random().toString(),
@@ -145,21 +158,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
 
+      // Usar la ubicación del comercio de la compra para añadir/actualizar el maestro de comercios
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
         updatedExistingMerchant: updatedMerchantFromPurchase,
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
       
-      if (addedMerchantFromPurchase) {
-        setTimeout(() => {
-           toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido.`});
-        }, 0);
-      } else if (updatedExistingMerchantFromPurchase) {
-         setTimeout(() => {
-           toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchantFromPurchase.name}" a "${updatedExistingMerchantFromPurchase.location}".`});
-        }, 0);
-      }
+      setTimeout(() => {
+        if (addedMerchantFromPurchase) {
+            toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido a la lista de comercios.`});
+        } else if (updatedExistingMerchantFromPurchase) {
+            toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchantFromPurchase.name}" a "${updatedExistingMerchantFromPurchase.location}".`});
+        }
+      },0);
 
 
       const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM');
@@ -183,23 +195,33 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [toast, addMerchantInternal]);
 
-  const updateSettings = useCallback((newSettings: BenefitSettings) => {
-    setState(prevState => ({ ...prevState, settings: newSettings }));
+  const updateSettings = useCallback((newSettingsData: Partial<BenefitSettings>) => {
+    setState(prevState => ({ 
+      ...prevState, 
+      settings: {
+        ...prevState.settings,
+        ...newSettingsData // Aplicar solo los cambios, manteniendo lastBackupTimestamp si no viene en newSettingsData
+      } 
+    }));
   }, []);
 
   const addMerchant = useCallback((merchantName: string, merchantLocation?: string): { success: boolean; merchant?: Merchant; message?: string } => {
     let result: { success: boolean; merchant?: Merchant; message?: string } = { success: false };
     setState(prevState => {
-      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, merchantLocation, prevState);
+      const { updatedMerchants, newMerchant, alreadyExists, updatedExistingMerchant } = addMerchantInternal(merchantName, merchantLocation, prevState);
 
       if (newMerchant) {
         result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" ${newMerchant.location ? `en "${newMerchant.location}"` : ''} añadido exitosamente.` };
          return { ...prevState, merchants: updatedMerchants };
+      } else if (updatedExistingMerchant) { // Si se actualizó la ubicación de un comercio existente
+        result = { success: true, merchant: updatedExistingMerchant, message: `Se actualizó la ubicación del comercio "${updatedExistingMerchant.name}" a "${updatedExistingMerchant.location}".` };
+        return { ...prevState, merchants: updatedMerchants };
       } else if (alreadyExists) {
         const locationMsg = (merchantLocation || '').trim() ? `en "${(merchantLocation || '').trim()}"` : '';
         result = { success: false, message: `El comercio "${merchantName.trim()}" ${locationMsg} ya existe.` };
         return prevState;
       }
+      // Si no es nuevo, no se actualizó uno existente y no es duplicado (caso poco probable)
       result = { success: false, message: 'No se pudo procesar la solicitud del comercio.'}
       return prevState;
     });
@@ -213,7 +235,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       },0);
       return;
     }
-    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Ubicación Comercio", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
+    const headers = ["ID", "Monto Original", "Fecha", "Comercio", "Ubicación Compra", "Descripción", "Descuento Aplicado", "Monto Final", "URL Recibo"];
     const csvRows = [
       headers.join(','),
       ...state.purchases.map(p => [
@@ -256,7 +278,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'Monto Original': p.amount,
         Fecha: format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
         Comercio: p.merchantName,
-        'Ubicación Comercio': p.merchantLocation || '',
+        'Ubicación Compra': p.merchantLocation || '', // Usar la ubicación de la compra
         Descripción: p.description || '',
         'URL Recibo': p.receiptImageUrl || '',
         'Descuento Aplicado': p.discountApplied,
@@ -266,7 +288,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const merchantsForExcel = state.merchants.map(m => ({
         ID: m.id,
         Nombre: m.name,
-        Ubicación: m.location || '',
+        Ubicación: m.location || '', // Usar la ubicación del maestro de comercios
       }));
 
       const wb = XLSX.utils.book_new();
@@ -336,7 +358,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             amount: typeof p['Monto Original'] === 'number' ? p['Monto Original'] : 0,
             date: purchaseDate,
             merchantName: String(p.Comercio || 'Desconocido'),
-            merchantLocation: String(p['Ubicación Comercio'] || undefined),
+            merchantLocation: String(p['Ubicación Compra'] || '') || undefined, // Asegurar que "" sea undefined
             description: String(p.Descripción || ''),
             receiptImageUrl: String(p['URL Recibo'] || ''),
             discountApplied: typeof p['Descuento Aplicado'] === 'number' ? p['Descuento Aplicado'] : 0,
@@ -347,7 +369,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const restoredMerchants: Merchant[] = merchantsFromExcel.map((m: any, index: number) => ({
           id: String(m.ID || `restored_merchant_${Date.now()}_${index}`),
           name: String(m.Nombre || 'Desconocido'),
-          location: String(m.Ubicación || undefined),
+          location: String(m.Ubicación || '') || undefined, // Asegurar que "" sea undefined
         }));
         
         if (!Array.isArray(restoredPurchases) || !Array.isArray(restoredMerchants)) {
@@ -358,6 +380,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prevState,
           purchases: restoredPurchases,
           merchants: restoredMerchants,
+          settings: {
+            ...prevState.settings,
+            lastBackupTimestamp: Date.now(), // Actualizar timestamp del último backup
+          }
         }));
 
         setTimeout(() => {
@@ -379,58 +405,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
     reader.readAsArrayBuffer(file);
   }, [toast]);
-
-  // Efecto para el recordatorio de backup diario
-  useEffect(() => {
-    if (!isInitialized || !state.settings.preferredBackupTime) {
-      return;
-    }
-
-    const backupPromptDismissedToday = localStorage.getItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY);
-    const todayStr = startOfDay(new Date()).toISOString();
-
-    if (backupPromptDismissedToday === todayStr) {
-      return; // Ya se descartó el prompt hoy
-    }
-
-    const now = new Date();
-    const [hours, minutes] = state.settings.preferredBackupTime.split(':').map(Number);
-    const preferredBackupDateTimeToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
-    
-    const lastBackupTimestamp = state.settings.lastBackupTimestamp || 0;
-    const lastBackupDate = new Date(lastBackupTimestamp);
-
-    const backupIsDueToday = !(
-      lastBackupDate.getFullYear() === now.getFullYear() &&
-      lastBackupDate.getMonth() === now.getMonth() &&
-      lastBackupDate.getDate() === now.getDate()
-    );
-
-    if (backupIsDueToday && now >= preferredBackupDateTimeToday) {
-      const toastId = `backup-reminder-${Date.now()}`;
-      const handlePromptedBackup = () => {
-        backupToExcel();
-        dismiss(toastId); 
-        localStorage.setItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY, todayStr);
-      };
-      const handleDismissPrompt = () => {
-        dismiss(toastId);
-        localStorage.setItem(BACKUP_PROMPT_DISMISSED_TODAY_KEY, todayStr);
-      }
-
-      setTimeout(() => { // Envolver en setTimeout para evitar errores de renderizado
-        toast({
-          id: toastId,
-          title: "Recordatorio de Backup Diario",
-          description: `Es hora de tu backup diario programado (${state.settings.preferredBackupTime}). ¿Deseas realizarlo ahora?`,
-          action: <ToastAction altText="Backup ahora" onClick={handlePromptedBackup}>Backup ahora</ToastAction>,
-          duration: Infinity, // Para que el usuario deba interactuar
-          onDismiss: handleDismissPrompt, // Si el usuario cierra el toast manualmente
-          onAutoClose: handleDismissPrompt, // Si se cierra automáticamente (aunque duration sea Infinity)
-        });
-      },0);
-    }
-  }, [isInitialized, state.settings, toast, backupToExcel, dismiss]);
 
 
   return (

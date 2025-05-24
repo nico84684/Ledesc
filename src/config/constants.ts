@@ -6,7 +6,6 @@ export const DEFAULT_BENEFIT_SETTINGS: BenefitSettings = {
   discountPercentage: 70, // Porcentaje
   alertThresholdPercentage: 80, // Example 80%
   enableWeeklyReminders: false,
-  preferredBackupTime: undefined, // No hay hora preferida por defecto
   lastBackupTimestamp: 0, // 0 o null para indicar que nunca se ha hecho
 };
 
