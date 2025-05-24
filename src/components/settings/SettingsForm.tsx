@@ -4,14 +4,14 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SettingsFormSchema, type SettingsFormData } from '@/lib/schemas';
-import { updateSettingsAction, backupToGoogleDriveAction } from '@/lib/actions';
+import { updateSettingsAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, CloudUpload, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import type { BenefitSettings } from '@/types';
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
@@ -44,7 +45,7 @@ export function SettingsForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBackingUp, setIsBackingUp] = useState(false);
+  // const [isBackingUp, setIsBackingUp] = useState(false); // Removido para Google Drive
   const [isInitialSetup, setIsInitialSetup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -67,7 +68,10 @@ export function SettingsForm() {
       setIsInitialSetup(!setupComplete);
       if (settings) {
         form.reset({
-          ...settings,
+          monthlyAllowance: settings.monthlyAllowance,
+          discountPercentage: settings.discountPercentage,
+          alertThresholdPercentage: settings.alertThresholdPercentage,
+          enableWeeklyReminders: settings.enableWeeklyReminders,
         });
       }
     }
@@ -79,9 +83,9 @@ export function SettingsForm() {
       
       const newPurchases = purchases.filter(p => {
         try {
-          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime(); // ID format: 'timestampISO+random'
+          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime();
           return purchaseTimestamp > lastBackupTime;
-        } catch (e) { return false; } // En caso de ID malformado
+        } catch (e) { return false; }
       }).length;
 
       const newMerchants = merchants.filter(m => {
@@ -92,8 +96,7 @@ export function SettingsForm() {
       }).length;
       
       setCounters({ newPurchasesCount: newPurchases, newMerchantsCount: newMerchants });
-    } else if (isInitialized && settings.lastBackupTimestamp === 0) {
-      // Si nunca se hizo backup, todos son nuevos
+    } else if (isInitialized && (settings.lastBackupTimestamp === 0 || settings.lastBackupTimestamp === undefined)) {
       setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
     }
   }, [purchases, merchants, settings.lastBackupTimestamp, isInitialized]);
@@ -104,18 +107,15 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
-      // Solo enviar los campos que son parte del schema y no el lastBackupTimestamp
       const dataToUpdate: Partial<BenefitSettings> = {
         monthlyAllowance: data.monthlyAllowance,
         discountPercentage: data.discountPercentage,
         alertThresholdPercentage: data.alertThresholdPercentage,
         enableWeeklyReminders: data.enableWeeklyReminders,
       };
-      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); // Ajustar tipo si es necesario
+      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); 
       if (result.success && result.settings) {
-        // Asegurarse de que updateSettingsInStore actualice SOLO las settings, no el lastBackupTimestamp
         updateSettingsInStore({ ...settings, ...result.settings });
-
 
         if (wasInitialSetupPending) {
           localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
@@ -138,25 +138,8 @@ export function SettingsForm() {
     }
   }
 
-  async function handleGoogleDriveBackup() {
-    setIsBackingUp(true);
-    try {
-      const result = await backupToGoogleDriveAction({ purchases, settings, merchants }); // Incluir merchants si el flujo lo necesita
-      if (result.success) {
-        toast({ title: "Backup (Simulación Google Drive)", description: result.message });
-      } else {
-        toast({ title: "Error de Backup (Simulación Google Drive)", description: result.message, variant: 'destructive' });
-      }
-    } catch (error) {
-      toast({ title: "Error Inesperado", description: "Ocurrió un error durante el backup (simulación Google Drive).", variant: 'destructive' });
-    } finally {
-      setIsBackingUp(false);
-    }
-  }
-
   const handleExcelBackup = () => {
     backupToExcel();
-    // El timestamp se actualiza dentro de backupToExcel en el store, lo que disparará el useEffect de contadores
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -164,7 +147,7 @@ export function SettingsForm() {
     if (file) {
       setIsRestoring(true);
       try {
-        restoreFromExcelStore(file); // Esta función ahora debería actualizar lastBackupTimestamp en el store
+        restoreFromExcelStore(file); 
       } catch (error: any) {
          toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
       } finally {
@@ -361,22 +344,6 @@ export function SettingsForm() {
                 </ul>
               </div>
             </div>
-
-
-          <Separator className="my-6" />
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">
-              (Simulación) Realiza un backup de tus datos en Google Drive.
-            </p>
-            <Button onClick={handleGoogleDriveBackup} className="w-full" variant="outline" disabled={isBackingUp}>
-              {isBackingUp ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CloudUpload className="mr-2 h-4 w-4" />
-              )}
-              {isBackingUp ? 'Realizando Backup...' : 'Backup en Google Drive (Simulación)'}
-            </Button>
-          </div>
         </div>
       </CardContent>
     </Card>

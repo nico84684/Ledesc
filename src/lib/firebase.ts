@@ -1,13 +1,6 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { 
-  getAuth, 
-  GoogleAuthProvider, 
-  setPersistence,
-  inMemoryPersistence,
-  onAuthStateChanged
-} from "firebase/auth";
 import { getAnalytics, type Analytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
@@ -16,7 +9,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBTs8eDliTZFsYILU09WWM-Tdh1RpmEGSY",
   authDomain: "ledescapp.firebaseapp.com",
   projectId: "ledescapp",
-  storageBucket: "ledescapp.firebasestorage.app",
+  storageBucket: "ledescapp.firebasestorage.app", // Verificado y corregido según tu info
   messagingSenderId: "1068604912509",
   appId: "1:1068604912509:web:e0cb345e0e9a225aef9214",
   measurementId: "G-Y8NS9CH2WF"
@@ -32,41 +25,10 @@ if (!getApps().length) {
   console.log("[Firebase] App already initialized.");
 }
 
-const auth = getAuth(app);
-console.log("[Firebase] Auth instance obtained.");
-const googleProvider = new GoogleAuthProvider();
-console.log("[Firebase] GoogleAuthProvider instance created.");
-
-// Configurar persistencia ANTES de cualquier operación de autenticación
-if (typeof window !== 'undefined') {
-  setPersistence(auth, inMemoryPersistence)
-    .then(() => {
-      console.log("[Firebase] Auth persistence successfully set to inMemoryPersistence. No local storage should be used by Firebase Auth for session persistence.");
-    })
-    .catch((error) => {
-      console.error("[Firebase] CRITICAL Error setting auth persistence to inMemoryPersistence:", {
-        code: error.code,
-        message: error.message,
-        errorObject: error,
-      });
-    });
-} else {
-  console.log("[Firebase] Not in browser, skipping setPersistence for auth.");
-}
-
-// Log para onAuthStateChanged para depuración
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    console.log("[Firebase] onAuthStateChanged: User IS signed IN (from firebase.ts). UID:", user.uid);
-  } else {
-    console.log("[Firebase] onAuthStateChanged: User IS signed OUT (from firebase.ts).");
-  }
-});
-
+// Firebase Auth ya no se inicializa ni se usa aquí para el login con Google.
 
 let analytics: Analytics | undefined;
 if (typeof window !== 'undefined') {
-  // Initialize Analytics only on the client side
   try {
     analytics = getAnalytics(app);
     console.log("[Firebase] Analytics initialized.");
@@ -75,4 +37,4 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export { app, auth, googleProvider, analytics };
+export { app, analytics };
