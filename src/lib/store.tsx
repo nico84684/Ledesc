@@ -44,13 +44,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const parsedState = JSON.parse(storedState);
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
           ...p,
-          date: p.date, 
+          date: p.date,
         }));
         parsedState.merchants = parsedState.merchants || [];
         parsedState.merchants = parsedState.merchants.map((m: Merchant) => ({
           id: m.id,
           name: m.name,
-          location: m.location, 
+          location: m.location,
         }));
         setState(parsedState);
       } catch (error) {
@@ -73,44 +73,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state, isInitialized, router, pathname]);
 
-  const addMerchantInternal = useCallback((merchantName: string, merchantLocation: string | undefined, currentState: AppState): { 
-    updatedMerchants: Merchant[], 
-    newMerchant?: Merchant, 
-    updatedExistingMerchant?: Merchant, 
-    alreadyExistsAndNoUpdate: boolean 
+  const addMerchantInternal = useCallback((merchantName: string, merchantLocationParam: string | undefined, currentState: AppState): {
+    updatedMerchants: Merchant[],
+    newMerchant?: Merchant,
+    alreadyExists: boolean
   } => {
     const trimmedName = merchantName.trim();
+    // Normalize location: treat undefined, null, or empty string as an empty string for comparison and storage.
+    const normalizedLocation = (merchantLocationParam || '').trim();
+
     const existingMerchantIndex = currentState.merchants.findIndex(
-      (m) => m.name.toLowerCase() === trimmedName.toLowerCase()
+      (m) => m.name.toLowerCase() === trimmedName.toLowerCase() &&
+             (m.location || '').toLowerCase() === normalizedLocation.toLowerCase()
     );
 
     if (existingMerchantIndex > -1) {
-      const merchantsCopy = [...currentState.merchants];
-      const existingMerchant = merchantsCopy[existingMerchantIndex];
-      
-      // Si el comercio existe y se proporciona una nueva ubicación Y el comercio existente NO tenía ubicación, actualízala.
-      if (merchantLocation && merchantLocation.trim() && !existingMerchant.location) {
-        existingMerchant.location = merchantLocation.trim();
-        return { 
-          updatedMerchants: merchantsCopy.sort((a, b) => a.name.localeCompare(b.name)), 
-          updatedExistingMerchant: existingMerchant, 
-          alreadyExistsAndNoUpdate: false 
-        };
-      }
-      // Si ya existe y tiene ubicación, o no se proporciona nueva ubicación válida, o se proporciona la misma, no se hace nada.
-      return { updatedMerchants: currentState.merchants, alreadyExistsAndNoUpdate: true };
+      // Comercio con mismo nombre y misma ubicación ya existe
+      return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
 
-    // Si no existe, crear nuevo
+    // Si no existe la combinación nombre+ubicación, crear nuevo
     const newMerchant: Merchant = {
       id: new Date().toISOString() + Math.random().toString(),
       name: trimmedName,
-      location: merchantLocation?.trim() || undefined,
+      location: normalizedLocation || undefined, // Guardar undefined si la ubicación normalizada es vacía
     };
-    return { 
-      updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name)), 
-      newMerchant, 
-      alreadyExistsAndNoUpdate: false 
+    return {
+      updatedMerchants: [...currentState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')),
+      newMerchant,
+      alreadyExists: false
     };
   }, []);
 
@@ -129,28 +120,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
-      
-      const { 
-        updatedMerchants: merchantsAfterPurchase, 
+
+      const {
+        updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
-        updatedExistingMerchant: updatedMerchantLocation
+        alreadyExists,
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
-      
+
       if (addedMerchantFromPurchase) {
         setTimeout(() => {
-           toast({ title: "Nuevo Comercio Añadido", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido a la lista.`});
+           toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido.`});
         }, 0);
-      } else if (updatedMerchantLocation) {
-         setTimeout(() => {
-           toast({ title: "Ubicación de Comercio Actualizada", description: `Se añadió/actualizó la ubicación a "${updatedMerchantLocation.location}" para el comercio "${updatedMerchantLocation.name}".`});
-        }, 0);
+      } else if (alreadyExists) {
+        // Opcional: podrías dar un toast informando que el comercio ya existía y no se añadió de nuevo.
+        // Por ahora, no hacemos nada para no saturar con toasts.
       }
-      
-      const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM'); 
+
+      const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM');
       const spentThisMonth = updatedPurchases
-        .filter(p => format(parseISO(p.date), 'yyyy-MM') === currentMonth) 
+        .filter(p => format(parseISO(p.date), 'yyyy-MM') === currentMonth)
         .reduce((sum, p) => sum + p.finalAmount, 0);
-      
+
       const usagePercentage = (prevState.settings.monthlyAllowance > 0) ? (spentThisMonth / prevState.settings.monthlyAllowance) * 100 : 0;
 
       if (prevState.settings.monthlyAllowance > 0 && usagePercentage >= prevState.settings.alertThresholdPercentage) {
@@ -162,7 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           });
         }, 0);
       }
-      
+
       return { ...prevState, purchases: updatedPurchases, merchants: merchantsAfterPurchase };
     });
   }, [toast, addMerchantInternal]);
@@ -174,25 +164,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const addMerchant = useCallback((merchantName: string, merchantLocation?: string): { success: boolean; merchant?: Merchant; message?: string } => {
     let result: { success: boolean; merchant?: Merchant; message?: string } = { success: false };
     setState(prevState => {
-      const { updatedMerchants, newMerchant, alreadyExistsAndNoUpdate, updatedExistingMerchant } = addMerchantInternal(merchantName, merchantLocation, prevState);
-      
+      const { updatedMerchants, newMerchant, alreadyExists } = addMerchantInternal(merchantName, merchantLocation, prevState);
+
       if (newMerchant) {
-        result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" añadido exitosamente.` };
+        result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" ${newMerchant.location ? `en "${newMerchant.location}"` : ''} añadido exitosamente.` };
          return { ...prevState, merchants: updatedMerchants };
-      } else if (updatedExistingMerchant) {
-         result = { success: true, merchant: updatedExistingMerchant, message: `Ubicación actualizada para "${updatedExistingMerchant.name}".` };
-         return { ...prevState, merchants: updatedMerchants };
-      } else if (alreadyExistsAndNoUpdate) {
-        result = { success: false, message: `El comercio "${merchantName.trim()}" ya existe y no se proporcionó una nueva ubicación o ya tenía una.` };
-        return prevState; 
+      } else if (alreadyExists) {
+        const locationMsg = (merchantLocation || '').trim() ? `en "${(merchantLocation || '').trim()}"` : '';
+        result = { success: false, message: `El comercio "${merchantName.trim()}" ${locationMsg} ya existe.` };
+        return prevState;
       }
-      // Should not reach here if logic is correct, but as a fallback
+      // Fallback, no debería llegar aquí
       result = { success: false, message: 'No se pudo procesar la solicitud del comercio.'}
       return prevState;
     });
     return result;
   }, [addMerchantInternal]);
-  
+
   const exportToCSV = useCallback(() => {
     if (state.purchases.length === 0) {
       setTimeout(() => {
@@ -206,16 +194,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...state.purchases.map(p => [
         p.id,
         p.amount,
-        format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'), 
-        `"${p.merchantName.replace(/"/g, '""')}"`, 
-        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`, 
+        format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
+        `"${p.merchantName.replace(/"/g, '""')}"`,
+        `"${p.description ? p.description.replace(/"/g, '""') : ''}"`,
         p.discountApplied,
         p.finalAmount,
         p.receiptImageUrl || ''
       ].join(','))
     ];
     const csvString = csvRows.join('\n');
-    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' }); 
+    const blob = new Blob([`\uFEFF${csvString}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);

@@ -30,17 +30,21 @@ export function AddMerchantForm() {
   async function onSubmit(data: AddMerchantFormData) {
     setIsSubmitting(true);
     try {
-      const actionResult = await addManualMerchantAction(data);
+      // La acción del servidor solo procesa la solicitud, la lógica de unicidad está en el store
+      const actionResult = await addManualMerchantAction(data); 
 
       if (actionResult.success && actionResult.merchant) {
+        // addMerchantToStore ahora maneja la lógica de unicidad (nombre + ubicación)
         const storeResult = addMerchantToStore(actionResult.merchant.name, actionResult.merchant.location);
         if (storeResult.success && storeResult.merchant) {
-          toast({ title: "Éxito", description: `Comercio "${storeResult.merchant.name}" añadido.` });
+          toast({ title: "Éxito", description: storeResult.message });
           form.reset();
         } else {
-          toast({ title: "Información", description: storeResult.message || "El comercio ya existe o no se pudo añadir.", variant: 'default' });
+          // Si el store indica que ya existe o hubo otro problema
+          toast({ title: "Información", description: storeResult.message || "No se pudo añadir el comercio.", variant: 'default' });
         }
       } else {
+        // Error de la acción del servidor (poco probable en este setup simple)
         toast({ title: "Error", description: actionResult.message || "No se pudo procesar el registro del comercio.", variant: 'destructive' });
       }
     } catch (error) {
@@ -57,7 +61,7 @@ export function AddMerchantForm() {
           <Building2 className="h-5 w-5 text-primary" />
           Añadir Nuevo Comercio
         </CardTitle>
-        <CardDescription>Registra un nuevo comercio manualmente.</CardDescription>
+        <CardDescription>Registra un nuevo comercio manualmente. Se considera único por nombre y ubicación.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -69,7 +73,7 @@ export function AddMerchantForm() {
                 <FormItem>
                   <FormLabel>Nombre del Comercio</FormLabel>
                   <FormControl>
-                    <Input placeholder="Ej: Café Martínez Central" {...field} />
+                    <Input placeholder="Ej: Café Martínez" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -82,7 +86,7 @@ export function AddMerchantForm() {
                 <FormItem>
                   <FormLabel className="flex items-center">
                     <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
-                    Ubicación (Opcional)
+                    Ubicación (Opcional, pero ayuda a distinguir sucursales)
                   </FormLabel>
                   <FormControl>
                     <Input placeholder="Ej: Av. Corrientes 1234, CABA" {...field} />
