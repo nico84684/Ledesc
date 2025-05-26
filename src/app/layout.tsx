@@ -37,9 +37,9 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
 
-        <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192x192.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icons/icon-512x512.png" />
+        <link rel="apple-touch-icon" href="/images/ledesc-icon.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/images/ledesc-icon.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/images/ledesc-icon.png" />
         
         {/* Add more icon sizes for apple-touch-icon if needed */}
       </head>
