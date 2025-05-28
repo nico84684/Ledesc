@@ -4,7 +4,7 @@ import withPWAInit from '@ducanh2912/next-pwa';
 
 const pwaConfig = {
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // Deshabilita PWA en desarrollo
+  disable: false, // Habilitar PWA incluso en desarrollo para pruebas en Firebase Studio
   register: true, // Registra el service worker
   skipWaiting: true, // Instala el nuevo SW inmediatamente
   cacheOnFrontEndNav: true, // Cachea navegaciones del lado del cliente (App Router)
