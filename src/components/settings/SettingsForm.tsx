@@ -32,6 +32,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BenefitSettings } from '@/types';
 import { useAuth } from '@/components/layout/Providers';
+import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
@@ -47,8 +48,8 @@ export function SettingsForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBackingUpToDrive, setIsBackingUpToDrive] = useState(false);
   const [isInitialSetup, setIsInitialSetup] = useState(false);
+  const [isBackingUpToDrive, setIsBackingUpToDrive] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,45 +67,42 @@ export function SettingsForm() {
       enableWeeklyReminders: settings?.enableWeeklyReminders || DEFAULT_BENEFIT_SETTINGS.enableWeeklyReminders,
     },
   });
-  
+
   useEffect(() => {
     if (isInitialized) {
       const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
-      setIsInitialSetup(!setupComplete);
-      if (settings) {
-        form.reset({
-          monthlyAllowance: settings.monthlyAllowance,
-          discountPercentage: settings.discountPercentage,
-          alertThresholdPercentage: settings.alertThresholdPercentage,
-          enableWeeklyReminders: settings.enableWeeklyReminders,
-        });
+      if (!setupComplete) {
+        setIsInitialSetup(true);
       }
+      // Siempre resetear el formulario con los datos del store (o por defecto) cuando se inicializa
+      form.reset({
+        monthlyAllowance: settings?.monthlyAllowance || DEFAULT_BENEFIT_SETTINGS.monthlyAllowance,
+        discountPercentage: settings?.discountPercentage || DEFAULT_BENEFIT_SETTINGS.discountPercentage,
+        alertThresholdPercentage: settings?.alertThresholdPercentage || DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage,
+        enableWeeklyReminders: settings?.enableWeeklyReminders || DEFAULT_BENEFIT_SETTINGS.enableWeeklyReminders,
+      });
     }
-  }, [settings, form, isInitialized]);
+  }, [isInitialized, settings, form]);
+
 
   useEffect(() => {
-    if (isInitialized && settings?.lastBackupTimestamp !== undefined) {
-      const lastBackupTime = settings.lastBackupTimestamp || 0;
-      
-      const newPurchases = purchases.filter(p => {
-        try {
-          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime();
-          return purchaseTimestamp > lastBackupTime;
-        } catch (e) { return false; }
-      }).length;
-
+    if (isInitialized && settings && settings.lastBackupTimestamp && settings.lastBackupTimestamp > 0) {
+      const newPurchases = purchases.filter(p => parseISO(p.date).getTime() > (settings.lastBackupTimestamp || 0));
       const newMerchants = merchants.filter(m => {
-         try {
-          const merchantTimestamp = parseISO(m.id.split('+')[0]).getTime();
-          return merchantTimestamp > lastBackupTime;
-        } catch (e) { return false; }
-      }).length;
-      
-      setCounters({ newPurchasesCount: newPurchases, newMerchantsCount: newMerchants });
-    } else if (isInitialized && (!settings?.lastBackupTimestamp)) {
-      setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
+        const purchaseUsingMerchant = purchases.find(p => p.merchantName === m.name && (p.merchantLocation || '') === (m.location || ''));
+        return purchaseUsingMerchant ? parseISO(purchaseUsingMerchant.date).getTime() > (settings.lastBackupTimestamp || 0) : true;
+      });
+      setCounters({
+        newPurchasesCount: newPurchases.length,
+        newMerchantsCount: newMerchants.length,
+      });
+    } else if (isInitialized) {
+      setCounters({
+        newPurchasesCount: purchases.length,
+        newMerchantsCount: merchants.length,
+      });
     }
-  }, [purchases, merchants, settings?.lastBackupTimestamp, isInitialized]);
+  }, [isInitialized, settings, purchases, merchants]);
 
 
   async function onSubmit(data: SettingsFormData) {
@@ -118,7 +116,7 @@ export function SettingsForm() {
         alertThresholdPercentage: data.alertThresholdPercentage,
         enableWeeklyReminders: data.enableWeeklyReminders,
       };
-      const result = await updateSettingsAction(data); 
+      const result = await updateSettingsAction(dataToUpdate);
       if (result.success && result.settings) {
         updateSettingsInStore(result.settings);
 
@@ -401,3 +399,5 @@ export function SettingsForm() {
     </Card>
   );
 }
+
+    
