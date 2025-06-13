@@ -16,6 +16,7 @@ export interface BenefitSettings {
   discountPercentage: number; // e.g., 15 for 15%
   alertThresholdPercentage: number; // e.g., 80 for 80%
   enableWeeklyReminders: boolean;
+  autoBackupToDrive: boolean; // Nueva opción para backup automático
   lastBackupTimestamp?: number; // Milliseconds since epoch
 }
 

@@ -3,16 +3,15 @@
 "use client";
 
 import type { ReactNode } from 'react';
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid, startOfDay } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { format, parseISO, isValid } from 'date-fns';
 import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { ToastAction } from "@/components/ui/toast";
-
+import { triggerGoogleDriveBackupAction } from '@/lib/actions'; // Importar la acción
+import { useAuth } from '@/components/layout/Providers'; // Importar useAuth
 
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
@@ -35,7 +34,8 @@ const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast, dismiss } = useToast();
+  const { toast } = useToast();
+  const { user, accessToken } = useAuth(); // Obtener estado de autenticación
 
   const [state, setState] = useState<AppState>({
     purchases: [],
@@ -43,6 +43,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     merchants: [],
   });
   const [isInitialized, setIsInitialized] = useState(false);
+
+  const isMounted = useRef(false);
+  const previousPurchasesRef = useRef<Purchase[]>();
+  const previousMerchantsRef = useRef<Merchant[]>();
+
 
   useEffect(() => {
     const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -52,6 +57,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const currentSettings = { 
           ...DEFAULT_BENEFIT_SETTINGS, 
           ...parsedState.settings,
+          autoBackupToDrive: parsedState.settings.autoBackupToDrive === undefined ? DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive : parsedState.settings.autoBackupToDrive,
           lastBackupTimestamp: parsedState.settings.lastBackupTimestamp || DEFAULT_BENEFIT_SETTINGS.lastBackupTimestamp,
         };
         
@@ -66,28 +72,105 @@ export function AppProvider({ children }: { children: ReactNode }) {
           location: m.location,
         }));
         setState({ ...parsedState, settings: currentSettings });
+        previousPurchasesRef.current = parsedState.purchases; // Inicializar refs con datos cargados
+        previousMerchantsRef.current = parsedState.merchants;
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
         setState(prevState => ({...prevState, settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings }}));
+        previousPurchasesRef.current = DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER.purchases; // Usar un placeholder o []
+        previousMerchantsRef.current = DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER.merchants;
       }
     } else {
       setState(prevState => ({...prevState, settings: DEFAULT_BENEFIT_SETTINGS}));
+      previousPurchasesRef.current = [];
+      previousMerchantsRef.current = [];
     }
     setIsInitialized(true);
+  }, []); // Carga inicial solo una vez
+
+  // Placeholder para inicialización de refs si no hay storedState
+  const DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER = { purchases: [], merchants: [] };
+
+
+  const updateLastBackupTimestamp = useCallback(() => {
+    setState(prevState => ({
+      ...prevState,
+      settings: {
+        ...prevState.settings,
+        lastBackupTimestamp: Date.now(),
+      }
+    }));
   }, []);
+
+  const handleAutoBackup = useCallback(async () => {
+    if (!state.settings.autoBackupToDrive || !user || !user.uid || !user.email || !accessToken) {
+      if (state.settings.autoBackupToDrive && isMounted.current) { // Solo loguear si no es la carga inicial y está habilitado
+         console.warn('[Auto Backup] Conditions for auto backup not met (user/token missing or feature disabled).');
+      }
+      return;
+    }
+
+    console.log('[Auto Backup] Triggering auto backup to Google Drive...');
+    try {
+      const result = await triggerGoogleDriveBackupAction(
+        user.uid,
+        user.email,
+        JSON.stringify(state.purchases),
+        JSON.stringify(state.merchants),
+        JSON.stringify(state.settings),
+        accessToken
+      );
+      if (result.success) {
+        updateLastBackupTimestamp();
+        console.log('[Auto Backup] Auto backup to Drive successful.');
+        // Considerar un toast muy discreto si se desea.
+        // toast({ title: "Backup Automático", description: "Datos guardados en Google Drive.", duration: 2000 });
+      } else {
+        console.error('[Auto Backup] Auto backup to Drive failed:', result.message);
+        toast({ title: "Error de Auto-Backup a Drive", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error('[Auto Backup] Exception during auto backup to Drive:', error);
+      toast({ title: "Error de Auto-Backup a Drive", description: error.message || "Ocurrió un error inesperado.", variant: "destructive" });
+    }
+  }, [state.settings, state.purchases, state.merchants, user, accessToken, toast, updateLastBackupTimestamp]);
+
 
   useEffect(() => {
     if (isInitialized) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-
-      if (router && pathname) {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
         if (!setupComplete && pathname !== '/settings') {
-          router.push('/settings');
+            router.push('/settings');
         }
-      }
+
+        if (isMounted.current) { 
+            const purchasesActuallyChanged = JSON.stringify(state.purchases) !== JSON.stringify(previousPurchasesRef.current);
+            const merchantsActuallyChanged = JSON.stringify(state.merchants) !== JSON.stringify(previousMerchantsRef.current);
+
+            if (state.settings.autoBackupToDrive && (purchasesActuallyChanged || merchantsActuallyChanged)) {
+                if (user && user.uid && user.email && accessToken) {
+                    console.log('[Auto Backup] Detected data change, attempting auto backup to Drive...');
+                    handleAutoBackup();
+                } else if (state.settings.autoBackupToDrive) {
+                    console.warn('[Auto Backup] Auto backup enabled but user not authenticated or token missing.');
+                }
+            }
+        } else {
+            // Primera ejecución después de la carga inicial desde localStorage
+            // Aquí previousPurchasesRef y previousMerchantsRef ya tienen el valor cargado o el default
+            // No se hace nada para el auto-backup, esperamos a la interacción del usuario.
+             if (!localStorage.getItem(LOCAL_STORAGE_KEY)) { // Si es la PRIMERA vez que se usa la app (no hay nada en localStorage)
+                previousPurchasesRef.current = [];
+                previousMerchantsRef.current = [];
+            }
+            isMounted.current = true;
+        }
+        previousPurchasesRef.current = state.purchases;
+        previousMerchantsRef.current = state.merchants;
     }
-  }, [state, isInitialized, router, pathname]);
+  }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup]);
+
 
   const addMerchantInternal = useCallback((merchantName: string, merchantLocationParam: string | undefined, currentState: AppState): {
     updatedMerchants: Merchant[],
@@ -264,16 +347,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.purchases, toast]);
 
-  const updateLastBackupTimestamp = useCallback(() => {
-    setState(prevState => ({
-      ...prevState,
-      settings: {
-        ...prevState.settings,
-        lastBackupTimestamp: Date.now(),
-      }
-    }));
-  }, []);
-
   const backupToExcel = useCallback(() => {
     try {
       const purchasesForExcel = state.purchases.map(p => ({
@@ -377,8 +450,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prevState,
           purchases: restoredPurchases,
           merchants: restoredMerchants,
-          // La restauración no actualiza el lastBackupTimestamp, ya que es una restauración, no un backup.
-          // Si quisiéramos un "lastSuccessfulSyncTimestamp", podríamos añadirlo.
         }));
 
         setTimeout(() => {
@@ -407,18 +478,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const restoredMerchants: Merchant[] = merchantsDataStr ? JSON.parse(merchantsDataStr) : [];
       const restoredSettingsPartial: Partial<BenefitSettings> = settingsDataStr ? JSON.parse(settingsDataStr) : {};
       
-      // Validar y mapear datos si es necesario, similar a restoreFromExcel
-      // Por ahora, asumimos que los datos de Drive ya están en el formato correcto.
-
       setState(prevState => ({
         ...prevState,
         purchases: restoredPurchases,
         merchants: restoredMerchants,
         settings: {
-          ...DEFAULT_BENEFIT_SETTINGS, // Empezar con los defaults para asegurar que todos los campos estén
-          ...prevState.settings,     // Mantener timestamps o configuraciones no presentes en el backup
-          ...restoredSettingsPartial, // Aplicar lo que vino del backup
-          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, // Mantener el timestamp del último backup exitoso
+          ...DEFAULT_BENEFIT_SETTINGS, 
+          ...prevState.settings,     
+          ...restoredSettingsPartial, 
+          autoBackupToDrive: restoredSettingsPartial.autoBackupToDrive === undefined ? prevState.settings.autoBackupToDrive : restoredSettingsPartial.autoBackupToDrive,
+          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, 
         },
       }));
       
@@ -459,4 +528,3 @@ export function useAppDispatch() {
   }
   return context;
 }
-

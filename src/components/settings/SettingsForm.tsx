@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon, UploadCloud, DownloadCloud } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -85,7 +85,6 @@ export function SettingsForm() {
   useEffect(() => {
     if (isInitialized && settings && settings.lastBackupTimestamp && settings.lastBackupTimestamp > 0) {
       const newPurchases = purchases.filter(p => parseISO(p.date).getTime() > (settings.lastBackupTimestamp || 0));
-      // Para los comercios, consideramos nuevo si alguna compra asociada es nueva, o si el comercio en sí es nuevo (no asociado a compras antiguas)
       const newMerchantsSet = new Set<string>();
       purchases.forEach(p => {
         if (parseISO(p.date).getTime() > (settings.lastBackupTimestamp || 0)) {
@@ -93,16 +92,14 @@ export function SettingsForm() {
         }
       });
       merchants.forEach(m => {
-         // Si un comercio no está en ninguna compra, lo consideramos nuevo si el timestamp es 0
         if (settings.lastBackupTimestamp === 0) newMerchantsSet.add(m.name + (m.location || ''));
-        // O si no está en una compra antigua
         const inOldPurchase = purchases.some(p => p.merchantName === m.name && (p.merchantLocation || '') === (m.location||'') && parseISO(p.date).getTime() <= (settings.lastBackupTimestamp || 0));
         if(!inOldPurchase) newMerchantsSet.add(m.name + (m.location || ''));
       })
 
       setCounters({
         newPurchasesCount: newPurchases.length,
-        newMerchantsCount: newMerchantsSet.size, // Usar el tamaño del Set para contar comercios únicos
+        newMerchantsCount: newMerchantsSet.size,
       });
 
     } else if (isInitialized) {
@@ -118,14 +115,16 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
-      // Preservar lastBackupTimestamp
-      const dataToUpdate: Partial<BenefitSettings> = {
-        ...data,
-        lastBackupTimestamp: settings?.lastBackupTimestamp || 0, 
+      const dataToUpdate: BenefitSettings = { // Asegurar que el tipo sea BenefitSettings completo
+        ...settings, // Empezar con los settings actuales para preservar campos no en el form (como lastBackupTimestamp)
+        ...data, // Sobrescribir con los datos del formulario
       };
-      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); // Cast porque ya incluimos lastBackupTimestamp
+      // El lastBackupTimestamp ya está preservado por el spread de settings
+      // y si no existe, será undefined, lo cual está bien.
+
+      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); // El action espera SettingsFormData, pero pasamos BenefitSettings
+      
       if (result.success && result.settings) {
-        // La acción del servidor devuelve los settings completos, que deberían incluir el lastBackupTimestamp preservado
         updateSettingsInStore(result.settings);
 
         if (wasInitialSetupPending) {
@@ -150,7 +149,7 @@ export function SettingsForm() {
   }
 
   const handleExcelBackup = () => {
-    backupToExcel(); // Esta función ya actualiza el lastBackupTimestamp en el store
+    backupToExcel(); 
   };
 
   const handleExcelRestoreFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +157,7 @@ export function SettingsForm() {
     if (file) {
       setIsRestoringFromExcel(true);
       try {
-        restoreFromExcelStore(file); // Esta función NO actualiza lastBackupTimestamp
+        restoreFromExcelStore(file); 
       } catch (error: any) {
          toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
       } finally {
@@ -179,7 +178,7 @@ export function SettingsForm() {
     try {
       const result = await triggerGoogleDriveBackupAction(user.uid, user.email, JSON.stringify(purchases), JSON.stringify(merchants), JSON.stringify(settings), accessToken);
       if (result.success) {
-        updateLastBackupTimestamp(); // Actualizar el timestamp en el store
+        updateLastBackupTimestamp(); 
         toast({ title: "Backup a Drive Exitoso", description: result.message });
       } else {
         toast({ title: "Error de Backup a Drive", description: result.message, variant: "destructive" });
@@ -201,7 +200,6 @@ export function SettingsForm() {
       const result = await triggerGoogleDriveRestoreAction(user.uid, user.email, accessToken);
       if (result.success && result.purchasesData && result.merchantsData && result.settingsData) {
         restoreFromDrive(result.purchasesData, result.merchantsData, result.settingsData);
-        // La restauración no actualiza el lastBackupTimestamp.
         toast({ title: "Restauración desde Drive Exitosa", description: result.message });
       } else {
         toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o ocurrió un error.", variant: "destructive" });
@@ -304,6 +302,27 @@ export function SettingsForm() {
                     </FormItem>
                   )}
                 />
+                 <FormField
+                  control={form.control}
+                  name="autoBackupToDrive"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base">Backup Automático a Google Drive</FormLabel>
+                        <FormDescription>
+                          Guardar automáticamente en Drive tras cada compra o cambio en comercios. Requiere inicio de sesión.
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                          aria-label="Activar backup automático a Google Drive"
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
                 {form.getValues("enableWeeklyReminders") && (
                   <div className="flex items-center p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
                     <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
@@ -332,16 +351,29 @@ export function SettingsForm() {
               <ShoppingCart className="h-4 w-4 mr-2 text-primary" /> 
               <span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup.</span>
             </div>
+             {settings?.autoBackupToDrive && user && (
+              <div className="flex items-center mt-2 text-green-700">
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                <span>Backup automático a Google Drive está ACTIVO.</span>
+              </div>
+            )}
+            {settings?.autoBackupToDrive && !user && (
+              <div className="flex items-center mt-2 text-orange-600">
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                <span>Backup automático activo, pero requiere iniciar sesión con Google.</span>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Columna de Backups */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-lg">Realizar Backup</h4>
+            <div className="space-y-4 p-4 border rounded-lg shadow-sm">
+              <h4 className="font-semibold text-lg flex items-center"><UploadCloud className="mr-2 h-5 w-5 text-primary"/>Realizar Backup</h4>
+              <Separator />
               <div className="space-y-3">
                 <Button onClick={handleExcelBackup} className="w-full" variant="outline">
                   <FileDown className="mr-2 h-4 w-4" />
-                  Backup a Excel
+                  A Excel
                 </Button>
                 <Button 
                   onClick={handleGoogleDriveBackup} 
@@ -350,21 +382,22 @@ export function SettingsForm() {
                   disabled={!user || isBackingUpToDrive || authLoading}
                 >
                   {isBackingUpToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                  {isBackingUpToDrive ? 'Realizando backup...' : 'Backup a Google Drive'}
+                  {isBackingUpToDrive ? 'Realizando backup...' : 'A Google Drive'}
                 </Button>
                 {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión con Google para backup en Drive.</p>}
               </div>
             </div>
 
             {/* Columna de Restauración */}
-            <div className="space-y-4">
-              <h4 className="font-semibold text-lg">Restaurar Datos</h4>
+            <div className="space-y-4 p-4 border rounded-lg shadow-sm">
+              <h4 className="font-semibold text-lg flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary"/>Restaurar Datos</h4>
+              <Separator />
               <div className="space-y-3">
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button className="w-full" variant="outline" disabled={isRestoringFromExcel}>
                       {isRestoringFromExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                      {isRestoringFromExcel ? 'Restaurando...' : 'Restaurar desde Excel'}
+                      {isRestoringFromExcel ? 'Restaurando...' : 'Desde Excel'}
                     </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
@@ -393,7 +426,7 @@ export function SettingsForm() {
                         disabled={!user || isRestoringFromDrive || authLoading}
                       >
                         {isRestoringFromDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />}
-                        {isRestoringFromDrive ? 'Restaurando...' : 'Restaurar desde Google Drive'}
+                        {isRestoringFromDrive ? 'Restaurando...' : 'Desde Google Drive'}
                       </Button>
                   </AlertDialogTrigger>
                   <AlertDialogContent>

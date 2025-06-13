@@ -21,6 +21,7 @@ export const SettingsFormSchema = z.object({
   discountPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo.").max(100, "El porcentaje no puede ser mayor a 100."),
   alertThresholdPercentage: z.coerce.number().min(0, "El umbral no puede ser negativo.").max(100, "El umbral no puede ser mayor a 100."),
   enableWeeklyReminders: z.boolean(),
+  autoBackupToDrive: z.boolean(), // Nueva opción
   lastBackupTimestamp: z.number().optional(), // Solo para lectura, no editable directamente
 });
 
