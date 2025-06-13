@@ -20,9 +20,10 @@ export const SettingsFormSchema = z.object({
   monthlyAllowance: z.coerce.number().min(1, "El beneficio mensual debe ser mayor a 0."),
   discountPercentage: z.coerce.number().min(0, "El porcentaje no puede ser negativo.").max(100, "El porcentaje no puede ser mayor a 100."),
   alertThresholdPercentage: z.coerce.number().min(0, "El umbral no puede ser negativo.").max(100, "El umbral no puede ser mayor a 100."),
-  enableWeeklyReminders: z.boolean(),
-  autoBackupToDrive: z.boolean(), // Nueva opción
-  lastBackupTimestamp: z.number().optional(), // Solo para lectura, no editable directamente
+  autoBackupToDrive: z.boolean(),
+  lastBackupTimestamp: z.number().optional(),
+  enableEndOfMonthReminder: z.boolean(), // Nuevo
+  daysBeforeEndOfMonthToRemind: z.coerce.number().min(1, "Debe ser al menos 1 día.").max(15, "No puede exceder los 15 días."), // Nuevo
 });
 
 export type SettingsFormData = z.infer<typeof SettingsFormSchema>;

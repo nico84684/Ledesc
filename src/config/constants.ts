@@ -5,9 +5,10 @@ export const DEFAULT_BENEFIT_SETTINGS: BenefitSettings = {
   monthlyAllowance: 68500, // ARS
   discountPercentage: 70, // Porcentaje
   alertThresholdPercentage: 80, // Example 80%
-  enableWeeklyReminders: false,
-  autoBackupToDrive: false, // Por defecto desactivado
-  lastBackupTimestamp: 0, // 0 para indicar que nunca se ha hecho un backup Excel/Restore
+  autoBackupToDrive: false,
+  lastBackupTimestamp: 0, 
+  enableEndOfMonthReminder: false, // Nuevo
+  daysBeforeEndOfMonthToRemind: 3, // Nuevo: Por defecto 3 días antes
 };
 
 export const APP_NAME = "LEDESC";

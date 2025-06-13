@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw, CalendarClock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -72,13 +72,19 @@ export function SettingsForm() {
     defaultValues: settings || DEFAULT_BENEFIT_SETTINGS,
   });
 
+  const watchEnableEndOfMonthReminder = form.watch("enableEndOfMonthReminder");
+
   useEffect(() => {
     if (isInitialized) {
       const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
       if (!setupComplete) {
         setIsInitialSetup(true);
       }
-      form.reset(settings || DEFAULT_BENEFIT_SETTINGS);
+      // Asegurar que todos los campos, incluyendo los nuevos, se resetean correctamente
+      form.reset({
+        ...DEFAULT_BENEFIT_SETTINGS,
+        ...(settings || {}),
+      });
     }
   }, [isInitialized, settings, form]);
 
@@ -115,14 +121,12 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
-      const dataToUpdate: BenefitSettings = { // Asegurar que el tipo sea BenefitSettings completo
-        ...settings, // Empezar con los settings actuales para preservar campos no en el form (como lastBackupTimestamp)
-        ...data, // Sobrescribir con los datos del formulario
+      const dataToUpdate: BenefitSettings = {
+        ...(settings || DEFAULT_BENEFIT_SETTINGS), // Mantener valores existentes no en el form
+        ...data,
       };
-      // El lastBackupTimestamp ya está preservado por el spread de settings
-      // y si no existe, será undefined, lo cual está bien.
 
-      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); // El action espera SettingsFormData, pero pasamos BenefitSettings
+      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); 
       
       if (result.success && result.settings) {
         updateSettingsInStore(result.settings);
@@ -283,25 +287,44 @@ export function SettingsForm() {
                 />
                 <FormField
                   control={form.control}
-                  name="enableWeeklyReminders"
+                  name="enableEndOfMonthReminder"
                   render={({ field }) => (
                     <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
                       <div className="space-y-0.5">
-                        <FormLabel className="text-base">Recordatorios Semanales</FormLabel>
+                        <FormLabel className="text-base flex items-center">
+                          <CalendarClock className="mr-2 h-4 w-4" />
+                          Recordatorio de Fin de Mes
+                        </FormLabel>
                         <FormDescription>
-                          Recibir un recordatorio si no se usa el beneficio. (Función simulada)
+                          Recibir una notificación si queda saldo pendiente cerca de fin de mes.
                         </FormDescription>
                       </div>
                       <FormControl>
                         <Switch
                           checked={field.value}
                           onCheckedChange={field.onChange}
-                          aria-label="Activar recordatorios semanales"
+                          aria-label="Activar recordatorio de fin de mes"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
+                {watchEnableEndOfMonthReminder && (
+                  <FormField
+                    control={form.control}
+                    name="daysBeforeEndOfMonthToRemind"
+                    render={({ field }) => (
+                      <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3">
+                        <FormLabel>Días antes de fin de mes para recordar</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
+                        </FormControl>
+                        <FormDescription>Se te recordará cuando falten estos días para terminar el mes, si tienes saldo.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
                  <FormField
                   control={form.control}
                   name="autoBackupToDrive"
@@ -323,12 +346,6 @@ export function SettingsForm() {
                     </FormItem>
                   )}
                 />
-                {form.getValues("enableWeeklyReminders") && (
-                  <div className="flex items-center p-3 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />
-                    <span>Los recordatorios semanales son una funcionalidad simulada y no enviarán notificaciones reales en esta versión.</span>
-                  </div>
-                )}
               </div>
               <Button type="submit" className="w-full" disabled={isSubmittingSettings}>
                 {isSubmittingSettings ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}

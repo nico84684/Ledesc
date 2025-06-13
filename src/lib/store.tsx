@@ -7,11 +7,12 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, getDaysInMonth, getDate, isSameMonth } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { triggerGoogleDriveBackupAction } from '@/lib/actions'; // Importar la acción
-import { useAuth } from '@/components/layout/Providers'; // Importar useAuth
+import { triggerGoogleDriveBackupAction } from '@/lib/actions'; 
+import { useAuth } from '@/components/layout/Providers'; 
 
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
@@ -35,12 +36,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { toast } = useToast();
-  const { user, accessToken } = useAuth(); // Obtener estado de autenticación
+  const { user, accessToken } = useAuth(); 
 
   const [state, setState] = useState<AppState>({
     purchases: [],
     settings: DEFAULT_BENEFIT_SETTINGS,
     merchants: [],
+    lastEndOfMonthReminderShownForMonth: undefined,
   });
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -59,6 +61,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...parsedState.settings,
           autoBackupToDrive: parsedState.settings.autoBackupToDrive === undefined ? DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive : parsedState.settings.autoBackupToDrive,
           lastBackupTimestamp: parsedState.settings.lastBackupTimestamp || DEFAULT_BENEFIT_SETTINGS.lastBackupTimestamp,
+          enableEndOfMonthReminder: parsedState.settings.enableEndOfMonthReminder === undefined ? DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder : parsedState.settings.enableEndOfMonthReminder,
+          daysBeforeEndOfMonthToRemind: parsedState.settings.daysBeforeEndOfMonthToRemind === undefined ? DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind : parsedState.settings.daysBeforeEndOfMonthToRemind,
         };
         
         parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
@@ -71,26 +75,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
           name: m.name,
           location: m.location,
         }));
-        setState({ ...parsedState, settings: currentSettings });
-        previousPurchasesRef.current = parsedState.purchases; // Inicializar refs con datos cargados
+        setState({ 
+          ...parsedState, 
+          settings: currentSettings,
+          lastEndOfMonthReminderShownForMonth: parsedState.lastEndOfMonthReminderShownForMonth 
+        });
+        previousPurchasesRef.current = parsedState.purchases; 
         previousMerchantsRef.current = parsedState.merchants;
       } catch (error) {
         console.error("Failed to parse state from localStorage", error);
-        setState(prevState => ({...prevState, settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings }}));
-        previousPurchasesRef.current = DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER.purchases; // Usar un placeholder o []
-        previousMerchantsRef.current = DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER.merchants;
+        setState(prevState => ({
+          ...prevState, 
+          settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings },
+          lastEndOfMonthReminderShownForMonth: undefined,
+        }));
+        previousPurchasesRef.current = []; 
+        previousMerchantsRef.current = [];
       }
     } else {
-      setState(prevState => ({...prevState, settings: DEFAULT_BENEFIT_SETTINGS}));
+      setState(prevState => ({
+        ...prevState, 
+        settings: DEFAULT_BENEFIT_SETTINGS,
+        lastEndOfMonthReminderShownForMonth: undefined,
+      }));
       previousPurchasesRef.current = [];
       previousMerchantsRef.current = [];
     }
     setIsInitialized(true);
-  }, []); // Carga inicial solo una vez
-
-  // Placeholder para inicialización de refs si no hay storedState
-  const DEFAULT_BENEFIT_SETTINGS_PLACEHOLDER = { purchases: [], merchants: [] };
-
+  }, []); 
 
   const updateLastBackupTimestamp = useCallback(() => {
     setState(prevState => ({
@@ -104,7 +116,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const handleAutoBackup = useCallback(async () => {
     if (!state.settings.autoBackupToDrive || !user || !user.uid || !user.email || !accessToken) {
-      if (state.settings.autoBackupToDrive && isMounted.current) { // Solo loguear si no es la carga inicial y está habilitado
+      if (state.settings.autoBackupToDrive && isMounted.current) { 
          console.warn('[Auto Backup] Conditions for auto backup not met (user/token missing or feature disabled).');
       }
       return;
@@ -123,8 +135,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (result.success) {
         updateLastBackupTimestamp();
         console.log('[Auto Backup] Auto backup to Drive successful.');
-        // Considerar un toast muy discreto si se desea.
-        // toast({ title: "Backup Automático", description: "Datos guardados en Google Drive.", duration: 2000 });
       } else {
         console.error('[Auto Backup] Auto backup to Drive failed:', result.message);
         toast({ title: "Error de Auto-Backup a Drive", description: result.message, variant: "destructive" });
@@ -157,10 +167,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
             }
         } else {
-            // Primera ejecución después de la carga inicial desde localStorage
-            // Aquí previousPurchasesRef y previousMerchantsRef ya tienen el valor cargado o el default
-            // No se hace nada para el auto-backup, esperamos a la interacción del usuario.
-             if (!localStorage.getItem(LOCAL_STORAGE_KEY)) { // Si es la PRIMERA vez que se usa la app (no hay nada en localStorage)
+             if (!localStorage.getItem(LOCAL_STORAGE_KEY)) { 
                 previousPurchasesRef.current = [];
                 previousMerchantsRef.current = [];
             }
@@ -170,6 +177,48 @@ export function AppProvider({ children }: { children: ReactNode }) {
         previousMerchantsRef.current = state.merchants;
     }
   }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup]);
+
+  // Effect for End of Month Reminder
+  useEffect(() => {
+    if (!isInitialized || !state.settings.enableEndOfMonthReminder) {
+      return;
+    }
+
+    const now = new Date();
+    const currentMonthYear = format(now, 'yyyy-MM');
+
+    if (state.lastEndOfMonthReminderShownForMonth === currentMonthYear) {
+      return; // Reminder already shown for this month
+    }
+
+    const daysInCurrentMonth = getDaysInMonth(now);
+    const currentDayOfMonth = getDate(now);
+    const daysRemainingInMonth = daysInCurrentMonth - currentDayOfMonth;
+
+    if (daysRemainingInMonth >= 0 && daysRemainingInMonth <= state.settings.daysBeforeEndOfMonthToRemind) {
+      const totalSpentThisMonth = state.purchases
+        .filter(p => isSameMonth(parseISO(p.date), now))
+        .reduce((sum, p) => sum + p.finalAmount, 0);
+      
+      const remainingBalance = Math.max(0, state.settings.monthlyAllowance - totalSpentThisMonth);
+
+      if (remainingBalance > 0) {
+        setTimeout(() => {
+          toast({
+            title: "Recordatorio de Beneficio",
+            description: `¡Atención! Quedan ${daysRemainingInMonth} día(s) para que termine ${format(now, "MMMM", { locale: es })} y aún tienes ${new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(remainingBalance)} de beneficio disponible.`,
+            variant: "default",
+            duration: 10000, // Longer duration for important reminder
+          });
+        },0);
+        
+        setState(prevState => ({
+          ...prevState,
+          lastEndOfMonthReminderShownForMonth: currentMonthYear,
+        }));
+      }
+    }
+  }, [isInitialized, state.settings, state.purchases, state.lastEndOfMonthReminderShownForMonth, toast]);
 
 
   const addMerchantInternal = useCallback((merchantName: string, merchantLocationParam: string | undefined, currentState: AppState): {
@@ -246,8 +295,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setTimeout(() => {
         if (addedMerchantFromPurchase) {
             toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromPurchase.name}" ${addedMerchantFromPurchase.location ? `en "${addedMerchantFromPurchase.location}"` : ''} ha sido añadido a la lista de comercios.`});
-        } else if (updatedExistingMerchantFromPurchase) {
-            toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchantFromPurchase.name}" a "${updatedExistingMerchantFromPurchase.location}".`});
+        } else if (updatedExistingMerchant) {
+            toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchant.name}" a "${updatedExistingMerchant.location}".`});
         }
       },0);
 
@@ -487,8 +536,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prevState.settings,     
           ...restoredSettingsPartial, 
           autoBackupToDrive: restoredSettingsPartial.autoBackupToDrive === undefined ? prevState.settings.autoBackupToDrive : restoredSettingsPartial.autoBackupToDrive,
-          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, 
+          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, // Mantener el timestamp local actual
+          enableEndOfMonthReminder: restoredSettingsPartial.enableEndOfMonthReminder === undefined ? prevState.settings.enableEndOfMonthReminder : restoredSettingsPartial.enableEndOfMonthReminder,
+          daysBeforeEndOfMonthToRemind: restoredSettingsPartial.daysBeforeEndOfMonthToRemind === undefined ? prevState.settings.daysBeforeEndOfMonthToRemind : restoredSettingsPartial.daysBeforeEndOfMonthToRemind,
         },
+        // No resetear lastEndOfMonthReminderShownForMonth aquí, dejar que la lógica de recordatorio lo maneje
       }));
       
       setTimeout(() => {
