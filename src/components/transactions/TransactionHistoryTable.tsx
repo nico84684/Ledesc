@@ -136,7 +136,7 @@ export function TransactionHistoryTable() {
             }}
           />
         </div>
-        <div className="flex items-end gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2">
           <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
             <FilterX className="mr-2 h-4 w-4" /> Limpiar
           </Button>

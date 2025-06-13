@@ -15,7 +15,7 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <div className="text-center md:text-left">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Bienvenido a {APP_NAME}
         </h1>
         <p className="text-muted-foreground">
@@ -28,8 +28,8 @@ export default function DashboardPage() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <PlusCircle className="h-6 w-6 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+              <PlusCircle className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               Nueva Compra
             </CardTitle>
             <CardDescription>Registra tus gastos gastronómicos fácil y rápido.</CardDescription>
@@ -43,8 +43,8 @@ export default function DashboardPage() {
 
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <History className="h-6 w-6 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+              <History className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               Historial
             </CardTitle>
             <CardDescription>Consulta todas tus transacciones pasadas.</CardDescription>
@@ -58,8 +58,8 @@ export default function DashboardPage() {
 
         <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Settings className="h-6 w-6 text-primary" />
+            <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
               Configuración
             </CardTitle>
             <CardDescription>Ajusta los parámetros de tu beneficio.</CardDescription>

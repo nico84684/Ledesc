@@ -12,7 +12,7 @@ export default function MerchantsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Comercios Adheridos
         </h1>
         <p className="text-muted-foreground">
