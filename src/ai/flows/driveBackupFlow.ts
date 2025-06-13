@@ -3,8 +3,6 @@
 /**
  * @fileOverview A placeholder flow for backing up data to Google Drive.
  * - backupDataToDrive - A function that simulates backing up data.
- * - DriveBackupInputSchema - The Zod schema for the input.
- * - DriveBackupOutputSchema - The Zod schema for the output.
  * - DriveBackupInput - The input type for the backupDataToDrive function.
  * - DriveBackupOutput - The return type for the backupDataToDrive function.
  */
@@ -12,7 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit'; // Corrected import for Zod from Genkit
 
-export const DriveBackupInputSchema = z.object({
+const DriveBackupInputSchema = z.object({
   userId: z.string().describe('The ID of the user performing the backup.'),
   userEmail: z.string().email().describe('The email of the user performing the backup.'),
   purchasesData: z.string().describe('JSON string of purchases data.'),
@@ -22,7 +20,7 @@ export const DriveBackupInputSchema = z.object({
 });
 export type DriveBackupInput = z.infer<typeof DriveBackupInputSchema>;
 
-export const DriveBackupOutputSchema = z.object({
+const DriveBackupOutputSchema = z.object({
   success: z.boolean(),
   message: z.string(),
   fileId: z.string().optional().describe('The ID of the file created/updated in Google Drive.'),
