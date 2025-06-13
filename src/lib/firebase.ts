@@ -30,6 +30,10 @@ if (!getApps().length) {
 const auth = getAuth(app);
 console.log("[Firebase] Auth initialized.");
 
+// REMINDER: To fix (auth/unauthorized-domain) errors,
+// you MUST add your application's domain (e.g., from Firebase Studio or your hosting provider)
+// to the list of "Authorized domains" in the Firebase Console:
+// Firebase Console -> Your Project -> Authentication -> Sign-in method -> Authorized domains.
 
 let analytics: Analytics | undefined;
 if (typeof window !== 'undefined') {
