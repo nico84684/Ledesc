@@ -1,4 +1,3 @@
-
 'use server';
 
 import {genkit, type PluginProvider} from 'genkit';
@@ -32,6 +31,5 @@ export const ai = genkit({
   // enableTracing: true, // Descomentar si necesitas tracing detallado
 });
 
-// Para asegurar que la configuración se aplica, podrías querer añadir un log simple aquí.
-console.log(`[Genkit Init] Genkit inicializado con ${plugins.length} plugin(s).`);
-
+// Se eliminó el console.log que causaba el error.
+// console.log(`[Genkit Init] Genkit inicializado con ${plugins.length} plugin(s).`);
