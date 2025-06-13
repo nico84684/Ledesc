@@ -4,14 +4,14 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SettingsFormSchema, type SettingsFormData } from '@/lib/schemas';
-import { updateSettingsAction } from '@/lib/actions';
+import { updateSettingsAction, triggerGoogleDriveBackupAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, Store as StoreIcon, UploadCloud } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -31,6 +31,7 @@ import {
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { BenefitSettings } from '@/types';
+import { useAuth } from '@/components/layout/Providers'; // Import useAuth
 
 const INITIAL_SETUP_COMPLETE_KEY = 'initialSetupComplete';
 
@@ -42,10 +43,11 @@ interface CountersState {
 export function SettingsForm() {
   const { settings, purchases, merchants } = useAppState(); 
   const { updateSettings: updateSettingsInStore, isInitialized, backupToExcel, restoreFromExcel: restoreFromExcelStore } = useAppDispatch();
+  const { user, loading: authLoading } = useAuth(); // Get user from AuthContext
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // const [isBackingUp, setIsBackingUp] = useState(false); // Removido para Google Drive
+  const [isBackingUpToDrive, setIsBackingUpToDrive] = useState(false);
   const [isInitialSetup, setIsInitialSetup] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,8 +59,12 @@ export function SettingsForm() {
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
-    defaultValues: {
-      ...settings,
+    defaultValues: { // Ensure all fields in schema are defaulted
+      monthlyAllowance: settings?.monthlyAllowance || DEFAULT_BENEFIT_SETTINGS.monthlyAllowance,
+      discountPercentage: settings?.discountPercentage || DEFAULT_BENEFIT_SETTINGS.discountPercentage,
+      alertThresholdPercentage: settings?.alertThresholdPercentage || DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage,
+      enableWeeklyReminders: settings?.enableWeeklyReminders || DEFAULT_BENEFIT_SETTINGS.enableWeeklyReminders,
+      // lastBackupTimestamp is not part of the form for direct edit
     },
   });
   
@@ -78,28 +84,29 @@ export function SettingsForm() {
   }, [settings, form, isInitialized]);
 
   useEffect(() => {
-    if (isInitialized && settings.lastBackupTimestamp !== undefined) {
+    if (isInitialized && settings?.lastBackupTimestamp !== undefined) {
       const lastBackupTime = settings.lastBackupTimestamp || 0;
       
       const newPurchases = purchases.filter(p => {
         try {
-          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime();
+          const purchaseTimestamp = parseISO(p.id.split('+')[0]).getTime(); // Assuming ID format includes timestamp
           return purchaseTimestamp > lastBackupTime;
-        } catch (e) { return false; }
+        } catch (e) { return false; } // Handle cases where ID might not be parsable as date
       }).length;
 
       const newMerchants = merchants.filter(m => {
          try {
-          const merchantTimestamp = parseISO(m.id.split('+')[0]).getTime();
+          const merchantTimestamp = parseISO(m.id.split('+')[0]).getTime(); // Assuming ID format
           return merchantTimestamp > lastBackupTime;
         } catch (e) { return false; }
       }).length;
       
       setCounters({ newPurchasesCount: newPurchases, newMerchantsCount: newMerchants });
-    } else if (isInitialized && (settings.lastBackupTimestamp === 0 || settings.lastBackupTimestamp === undefined)) {
+    } else if (isInitialized && (!settings?.lastBackupTimestamp)) {
+      // If no backup timestamp, count all items as new
       setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
     }
-  }, [purchases, merchants, settings.lastBackupTimestamp, isInitialized]);
+  }, [purchases, merchants, settings?.lastBackupTimestamp, isInitialized]);
 
 
   async function onSubmit(data: SettingsFormData) {
@@ -107,15 +114,19 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
+      // Ensure we only pass fields relevant to SettingsFormData for the action
       const dataToUpdate: Partial<BenefitSettings> = {
         monthlyAllowance: data.monthlyAllowance,
         discountPercentage: data.discountPercentage,
         alertThresholdPercentage: data.alertThresholdPercentage,
         enableWeeklyReminders: data.enableWeeklyReminders,
       };
-      const result = await updateSettingsAction(dataToUpdate as SettingsFormData); 
+      // The server action now expects SettingsFormData which doesn't include lastBackupTimestamp directly
+      const result = await updateSettingsAction(data); 
       if (result.success && result.settings) {
-        updateSettingsInStore({ ...settings, ...result.settings });
+        // updateSettingsInStore expects a Partial<BenefitSettings>
+        // It merges with existing settings, preserving lastBackupTimestamp unless explicitly passed
+        updateSettingsInStore(result.settings);
 
         if (wasInitialSetupPending) {
           localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
@@ -129,7 +140,7 @@ export function SettingsForm() {
           toast({ title: "Éxito", description: "Configuración actualizada exitosamente." });
         }
       } else {
-        toast({ title: "Error", description: result.message, variant: 'destructive' });
+        toast({ title: "Error", description: result.message || "No se pudo actualizar la configuración.", variant: 'destructive' });
       }
     } catch (error) {
       toast({ title: "Error Inesperado", description: "Ocurrió un error al actualizar la configuración.", variant: 'destructive' });
@@ -139,7 +150,7 @@ export function SettingsForm() {
   }
 
   const handleExcelBackup = () => {
-    backupToExcel();
+    backupToExcel(); // This function in store now updates lastBackupTimestamp
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,19 +158,46 @@ export function SettingsForm() {
     if (file) {
       setIsRestoring(true);
       try {
-        restoreFromExcelStore(file); 
+        restoreFromExcelStore(file); // This function in store now updates lastBackupTimestamp
       } catch (error: any) {
          toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
       } finally {
         setIsRestoring(false);
          if(fileInputRef.current) {
-           fileInputRef.current.value = ""; 
+           fileInputRef.current.value = ""; // Clear the file input
          }
       }
     }
   };
 
-  if (!isInitialized) {
+  const handleGoogleDriveBackup = async () => {
+    if (!user || !user.uid || !user.email) {
+      toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google para usar esta función.", variant: "destructive" });
+      return;
+    }
+    setIsBackingUpToDrive(true);
+    try {
+      const purchasesData = JSON.stringify(purchases);
+      const merchantsData = JSON.stringify(merchants);
+      const settingsData = JSON.stringify(settings); // Backup current settings as well
+
+      const result = await triggerGoogleDriveBackupAction(user.uid, user.email, purchasesData, merchantsData, settingsData);
+      if (result.success) {
+        toast({ title: "Backup a Drive (Simulado)", description: result.message });
+        // Optionally, update lastBackupTimestamp here if the Drive backup is considered a primary backup
+        // updateSettingsInStore({ lastBackupTimestamp: Date.now() });
+      } else {
+        toast({ title: "Error de Backup a Drive", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error de Backup a Drive", description: error.message || "Ocurrió un error inesperado.", variant: "destructive" });
+    } finally {
+      setIsBackingUpToDrive(false);
+    }
+  };
+
+
+  if (!isInitialized || authLoading) { // Also wait for auth to load
      return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner size={48} />
@@ -168,9 +206,9 @@ export function SettingsForm() {
     );
   }
   
-  const lastBackupInfo = settings.lastBackupTimestamp && settings.lastBackupTimestamp > 0
-    ? `Último backup: ${format(new Date(settings.lastBackupTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
-    : "Nunca se ha realizado un backup.";
+  const lastBackupDisplay = settings?.lastBackupTimestamp && settings.lastBackupTimestamp > 0
+    ? `Último backup (Excel/Restore): ${format(new Date(settings.lastBackupTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
+    : "Nunca se ha realizado un backup (Excel/Restore).";
 
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg">
@@ -276,7 +314,7 @@ export function SettingsForm() {
         <div className="space-y-4">
           <h3 className="text-lg font-medium">Gestión de Datos</h3>
           <div className="p-3 border rounded-md bg-muted/50 text-sm">
-            <p className="mb-1">{lastBackupInfo}</p>
+            <p className="mb-1">{lastBackupDisplay}</p>
             <div className="flex items-center">
               <ShoppingCart className="h-4 w-4 mr-2 text-primary" /> 
               <span>{counters.newPurchasesCount} compras nuevas desde el último backup.</span>
@@ -295,6 +333,22 @@ export function SettingsForm() {
               <FileDown className="mr-2 h-4 w-4" />
               Backup a Excel Ahora
             </Button>
+          </div>
+
+           <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Haz un backup (simulado) de tus datos en tu Google Drive. Debes iniciar sesión con Google.
+            </p>
+            <Button 
+              onClick={handleGoogleDriveBackup} 
+              className="w-full" 
+              variant="outline"
+              disabled={!user || isBackingUpToDrive}
+            >
+              {isBackingUpToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
+              {isBackingUpToDrive ? 'Realizando backup...' : 'Backup a Google Drive'}
+            </Button>
+            {!user && <p className="text-xs text-muted-foreground">Inicia sesión con Google para habilitar esta opción.</p>}
           </div>
 
           <div className="space-y-2">

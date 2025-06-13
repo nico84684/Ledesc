@@ -2,15 +2,49 @@
 "use client";
 
 import type { ReactNode } from 'react';
-// SessionProvider ya no es necesario aquí si solo usamos Firebase Auth para el login
-// import { SessionProvider } from "next-auth/react"; 
+import { createContext, useContext, useEffect, useState } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+
+interface AuthContextType {
+  user: User | null;
+  loading: boolean;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ user, loading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
+
+// Main Providers component that now includes AuthProvider
+export function Providers({ children }: ProvidersProps) {
+  return <AuthProvider>{children}</AuthProvider>;
+}
 
 interface ProvidersProps {
   children: ReactNode;
-}
-
-export function Providers({ children }: ProvidersProps) {
-  // Si tienes otros proveedores de contexto global, pueden ir aquí.
-  // Por ahora, solo devolvemos children ya que SessionProvider fue removido.
-  return <>{children}</>;
 }

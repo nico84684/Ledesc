@@ -6,7 +6,7 @@ export const DEFAULT_BENEFIT_SETTINGS: BenefitSettings = {
   discountPercentage: 70, // Porcentaje
   alertThresholdPercentage: 80, // Example 80%
   enableWeeklyReminders: false,
-  lastBackupTimestamp: 0, // 0 o null para indicar que nunca se ha hecho
+  lastBackupTimestamp: 0, // 0 para indicar que nunca se ha hecho un backup Excel/Restore
 };
 
 export const APP_NAME = "LEDESC";

@@ -1,6 +1,7 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
+import { getAuth } from "firebase/auth"; // Import getAuth
 import { getAnalytics, type Analytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
@@ -9,7 +10,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBTs8eDliTZFsYILU09WWM-Tdh1RpmEGSY",
   authDomain: "ledescapp.firebaseapp.com",
   projectId: "ledescapp",
-  storageBucket: "ledescapp.firebasestorage.app", // Verificado y corregido según tu info
+  storageBucket: "ledescapp.firebasestorage.app",
   messagingSenderId: "1068604912509",
   appId: "1:1068604912509:web:e0cb345e0e9a225aef9214",
   measurementId: "G-Y8NS9CH2WF"
@@ -25,7 +26,10 @@ if (!getApps().length) {
   console.log("[Firebase] App already initialized.");
 }
 
-// Firebase Auth ya no se inicializa ni se usa aquí para el login con Google.
+// Initialize Firebase Authentication and get a reference to the service
+const auth = getAuth(app);
+console.log("[Firebase] Auth initialized.");
+
 
 let analytics: Analytics | undefined;
 if (typeof window !== 'undefined') {
@@ -37,4 +41,4 @@ if (typeof window !== 'undefined') {
   }
 }
 
-export { app, analytics };
+export { app, auth, analytics }; // Export auth
