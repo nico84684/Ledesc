@@ -10,7 +10,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit/zod'; // Correct import for zod from genkit
+import { z } from 'genkit'; // Corrected import for Zod from Genkit
 
 export const DriveBackupInputSchema = z.object({
   userId: z.string().describe('The ID of the user performing the backup.'),
@@ -18,6 +18,7 @@ export const DriveBackupInputSchema = z.object({
   purchasesData: z.string().describe('JSON string of purchases data.'),
   merchantsData: z.string().describe('JSON string of merchants data.'),
   settingsData: z.string().describe('JSON string of settings data.'),
+  accessToken: z.string().optional().describe('OAuth2 access token for Google Drive API.'),
 });
 export type DriveBackupInput = z.infer<typeof DriveBackupInputSchema>;
 
@@ -28,10 +29,17 @@ export const DriveBackupOutputSchema = z.object({
 });
 export type DriveBackupOutput = z.infer<typeof DriveBackupOutputSchema>;
 
-// This is the wrapper function Next.js components/server actions will call.
 export async function backupDataToDrive(input: DriveBackupInput): Promise<DriveBackupOutput> {
   console.log(`[backupDataToDrive Function] Called for user: ${input.userEmail}`);
-  // This directly calls the Genkit flow.
+  if (input.accessToken) {
+    console.log('[backupDataToDrive Function] OAuth Access Token received (first 10 chars):', input.accessToken.substring(0,10));
+  } else {
+    console.warn('[backupDataToDrive Function] OAuth Access Token NOT received.');
+     return {
+      success: false,
+      message: 'Backup to Google Drive requires a valid OAuth access token. Please sign in again.',
+    };
+  }
   return await _backupDataToDriveFlow(input);
 }
 
@@ -46,24 +54,30 @@ const _backupDataToDriveFlow = ai.defineFlow(
     console.log(`[Genkit Flow: backupDataToDriveFlow] Purchases data length: ${input.purchasesData.length}`);
     console.log(`[Genkit Flow: backupDataToDriveFlow] Merchants data length: ${input.merchantsData.length}`);
     console.log(`[Genkit Flow: backupDataToDriveFlow] Settings data length: ${input.settingsData.length}`);
+    console.log(`[Genkit Flow: backupDataToDriveFlow] AccessToken present: ${!!input.accessToken}`);
 
-    // TODO: Implement actual Google Drive API interaction here.
-    // This would involve:
-    // 1. Obtaining an OAuth2 access token for the user (this typically needs to be handled carefully,
-    //    Firebase client SDK can provide it if the correct scopes were requested during sign-in).
-    // 2. Using the 'googleapis' library to interact with the Drive API v3.
-    //    - Find or create an application-specific folder (e.g., "Ledesc App Backups").
-    //    - Create or update a file (e.g., "ledesc_backup.json" or "ledesc_backup.xlsx") within that folder.
-    //    - The file content would be the stringified JSON data or an Excel representation.
+    // TODO: Implement actual Google Drive API interaction here using input.accessToken.
+    // 1. Initialize googleapis.drive({ version: 'v3', auth: yourOAuth2Client })
+    //    yourOAuth2Client should be configured with the accessToken.
+    // 2. Use the Drive API to:
+    //    - Find or create an application-specific folder.
+    //    - Create or update a file (e.g., "ledesc_backup.json" or an Excel file) within that folder.
 
-    // Placeholder response:
-    // Simulate some delay
     await new Promise(resolve => setTimeout(resolve, 1500));
 
-    return {
-      success: true,
-      message: 'Backup to Google Drive simulated successfully. Actual Drive integration is pending.',
-      fileId: `simulated-drive-file-id-${Date.now()}`,
-    };
+    // Simulate success if token was present, failure otherwise
+    if (input.accessToken) {
+        return {
+        success: true,
+        message: 'Backup to Google Drive simulated successfully with access token. Actual Drive integration is pending.',
+        fileId: `simulated-drive-file-id-${Date.now()}`,
+        };
+    } else {
+        return {
+        success: false,
+        message: 'Simulation failed: Access token was missing in the flow.',
+        };
+    }
   }
 );
+
