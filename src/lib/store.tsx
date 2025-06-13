@@ -22,6 +22,8 @@ interface AppDispatchContextType {
   isInitialized: boolean;
   backupToExcel: () => void;
   restoreFromExcel: (file: File) => void;
+  restoreFromDrive: (purchasesData: string, merchantsData: string, settingsData: string) => void;
+  updateLastBackupTimestamp: () => void;
 }
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
@@ -47,8 +49,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (storedState) {
       try {
         const parsedState = JSON.parse(storedState) as AppState;
-        // Asegurar que los settings por defecto se apliquen si no están en el estado guardado
-        // y que no se sobreescriba lastBackupTimestamp si ya existe.
         const currentSettings = { 
           ...DEFAULT_BENEFIT_SETTINGS, 
           ...parsedState.settings,
@@ -71,7 +71,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setState(prevState => ({...prevState, settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings }}));
       }
     } else {
-      // Si no hay estado guardado, asegurarse de que los settings por defecto se usen completamente
       setState(prevState => ({...prevState, settings: DEFAULT_BENEFIT_SETTINGS}));
     }
     setIsInitialized(true);
@@ -94,11 +93,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updatedMerchants: Merchant[],
     newMerchant?: Merchant,
     alreadyExists: boolean,
-    updatedExistingMerchant?: Merchant // Ya no se usa para actualizar, solo para saber si se matcheo uno sin ubicacion
+    updatedExistingMerchant?: Merchant
   } => {
     const trimmedName = merchantName.trim();
     const normalizedNameKey = trimmedName.toLowerCase();
-    const normalizedLocationKey = (merchantLocationParam || '').trim().toLowerCase() || undefined; // Convertir "" a undefined
+    const normalizedLocationKey = (merchantLocationParam || '').trim().toLowerCase() || undefined;
 
     const existingMerchantIndex = currentState.merchants.findIndex(
         (m) => m.name.toLowerCase() === normalizedNameKey &&
@@ -109,22 +108,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { updatedMerchants: currentState.merchants, alreadyExists: true };
     }
     
-    // Si existe un comercio con el mismo nombre pero el existente NO tiene ubicación
-    // Y se está proveyendo una ubicación para el "nuevo" (que en realidad es el mismo sin ubicación)
     if (normalizedLocationKey) {
       const sameNameNoLocationMerchantIndex = currentState.merchants.findIndex(
         m => m.name.toLowerCase() === normalizedNameKey && !((m.location || '').trim())
       );
 
       if (sameNameNoLocationMerchantIndex > -1) {
-        // Actualizar la ubicación del comercio existente que no tenía una.
         const updatedMerchants = [...currentState.merchants];
         const merchantToUpdate = { ...updatedMerchants[sameNameNoLocationMerchantIndex], location: merchantLocationParam?.trim() };
         updatedMerchants[sameNameNoLocationMerchantIndex] = merchantToUpdate;
         return { 
           updatedMerchants: updatedMerchants.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')), 
-          updatedExistingMerchant: merchantToUpdate, // Indica que un comercio existente fue actualizado
-          alreadyExists: false // No es un duplicado exacto, sino una actualización
+          updatedExistingMerchant: merchantToUpdate, 
+          alreadyExists: false 
         };
       }
     }
@@ -149,7 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         amount: purchaseData.amount,
         date: purchaseData.date,
         merchantName: purchaseData.merchantName,
-        merchantLocation: purchaseData.merchantLocation, // Guardar la ubicación de la compra
+        merchantLocation: purchaseData.merchantLocation,
         description: purchaseData.description || undefined,
         receiptImageUrl: purchaseData.receiptImageUrl,
         id: new Date().toISOString() + Math.random().toString(),
@@ -158,7 +154,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       const updatedPurchases = [newPurchase, ...prevState.purchases];
 
-      // Usar la ubicación del comercio de la compra para añadir/actualizar el maestro de comercios
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
@@ -172,7 +167,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchantFromPurchase.name}" a "${updatedExistingMerchantFromPurchase.location}".`});
         }
       },0);
-
 
       const currentMonth = format(parseISO(newPurchase.date), 'yyyy-MM');
       const spentThisMonth = updatedPurchases
@@ -200,7 +194,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       ...prevState, 
       settings: {
         ...prevState.settings,
-        ...newSettingsData // Aplicar solo los cambios, manteniendo lastBackupTimestamp si no viene en newSettingsData
+        ...newSettingsData 
       } 
     }));
   }, []);
@@ -213,7 +207,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (newMerchant) {
         result = { success: true, merchant: newMerchant, message: `Comercio "${newMerchant.name}" ${newMerchant.location ? `en "${newMerchant.location}"` : ''} añadido exitosamente.` };
          return { ...prevState, merchants: updatedMerchants };
-      } else if (updatedExistingMerchant) { // Si se actualizó la ubicación de un comercio existente
+      } else if (updatedExistingMerchant) {
         result = { success: true, merchant: updatedExistingMerchant, message: `Se actualizó la ubicación del comercio "${updatedExistingMerchant.name}" a "${updatedExistingMerchant.location}".` };
         return { ...prevState, merchants: updatedMerchants };
       } else if (alreadyExists) {
@@ -221,7 +215,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         result = { success: false, message: `El comercio "${merchantName.trim()}" ${locationMsg} ya existe.` };
         return prevState;
       }
-      // Si no es nuevo, no se actualizó uno existente y no es duplicado (caso poco probable)
       result = { success: false, message: 'No se pudo procesar la solicitud del comercio.'}
       return prevState;
     });
@@ -271,6 +264,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [state.purchases, toast]);
 
+  const updateLastBackupTimestamp = useCallback(() => {
+    setState(prevState => ({
+      ...prevState,
+      settings: {
+        ...prevState.settings,
+        lastBackupTimestamp: Date.now(),
+      }
+    }));
+  }, []);
+
   const backupToExcel = useCallback(() => {
     try {
       const purchasesForExcel = state.purchases.map(p => ({
@@ -278,7 +281,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         'Monto Original': p.amount,
         Fecha: format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
         Comercio: p.merchantName,
-        'Ubicación Compra': p.merchantLocation || '', // Usar la ubicación de la compra
+        'Ubicación Compra': p.merchantLocation || '',
         Descripción: p.description || '',
         'URL Recibo': p.receiptImageUrl || '',
         'Descuento Aplicado': p.discountApplied,
@@ -288,7 +291,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const merchantsForExcel = state.merchants.map(m => ({
         ID: m.id,
         Nombre: m.name,
-        Ubicación: m.location || '', // Usar la ubicación del maestro de comercios
+        Ubicación: m.location || '',
       }));
 
       const wb = XLSX.utils.book_new();
@@ -300,13 +303,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
       XLSX.writeFile(wb, `LEDESC_Backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
       
-      setState(prevState => ({
-        ...prevState,
-        settings: {
-          ...prevState.settings,
-          lastBackupTimestamp: Date.now(),
-        }
-      }));
+      updateLastBackupTimestamp();
       
       setTimeout(() => {
         toast({ title: "Backup Exitoso", description: "Los datos se han exportado a un archivo Excel." });
@@ -318,7 +315,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast({ title: "Error de Backup", description: "No se pudo generar el archivo Excel.", variant: "destructive" });
       }, 0);
     }
-  }, [state.purchases, state.merchants, toast]);
+  }, [state.purchases, state.merchants, toast, updateLastBackupTimestamp]);
 
   const restoreFromExcel = useCallback((file: File) => {
     const reader = new FileReader();
@@ -358,7 +355,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             amount: typeof p['Monto Original'] === 'number' ? p['Monto Original'] : 0,
             date: purchaseDate,
             merchantName: String(p.Comercio || 'Desconocido'),
-            merchantLocation: String(p['Ubicación Compra'] || '') || undefined, // Asegurar que "" sea undefined
+            merchantLocation: String(p['Ubicación Compra'] || '') || undefined,
             description: String(p.Descripción || ''),
             receiptImageUrl: String(p['URL Recibo'] || ''),
             discountApplied: typeof p['Descuento Aplicado'] === 'number' ? p['Descuento Aplicado'] : 0,
@@ -369,7 +366,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const restoredMerchants: Merchant[] = merchantsFromExcel.map((m: any, index: number) => ({
           id: String(m.ID || `restored_merchant_${Date.now()}_${index}`),
           name: String(m.Nombre || 'Desconocido'),
-          location: String(m.Ubicación || '') || undefined, // Asegurar que "" sea undefined
+          location: String(m.Ubicación || '') || undefined,
         }));
         
         if (!Array.isArray(restoredPurchases) || !Array.isArray(restoredMerchants)) {
@@ -380,10 +377,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prevState,
           purchases: restoredPurchases,
           merchants: restoredMerchants,
-          settings: {
-            ...prevState.settings,
-            lastBackupTimestamp: Date.now(), // Actualizar timestamp del último backup
-          }
+          // La restauración no actualiza el lastBackupTimestamp, ya que es una restauración, no un backup.
+          // Si quisiéramos un "lastSuccessfulSyncTimestamp", podríamos añadirlo.
         }));
 
         setTimeout(() => {
@@ -406,10 +401,43 @@ export function AppProvider({ children }: { children: ReactNode }) {
     reader.readAsArrayBuffer(file);
   }, [toast]);
 
+  const restoreFromDrive = useCallback((purchasesDataStr?: string, merchantsDataStr?: string, settingsDataStr?: string) => {
+    try {
+      const restoredPurchases: Purchase[] = purchasesDataStr ? JSON.parse(purchasesDataStr) : [];
+      const restoredMerchants: Merchant[] = merchantsDataStr ? JSON.parse(merchantsDataStr) : [];
+      const restoredSettingsPartial: Partial<BenefitSettings> = settingsDataStr ? JSON.parse(settingsDataStr) : {};
+      
+      // Validar y mapear datos si es necesario, similar a restoreFromExcel
+      // Por ahora, asumimos que los datos de Drive ya están en el formato correcto.
+
+      setState(prevState => ({
+        ...prevState,
+        purchases: restoredPurchases,
+        merchants: restoredMerchants,
+        settings: {
+          ...DEFAULT_BENEFIT_SETTINGS, // Empezar con los defaults para asegurar que todos los campos estén
+          ...prevState.settings,     // Mantener timestamps o configuraciones no presentes en el backup
+          ...restoredSettingsPartial, // Aplicar lo que vino del backup
+          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, // Mantener el timestamp del último backup exitoso
+        },
+      }));
+      
+      setTimeout(() => {
+        toast({ title: "Restauración Exitosa", description: "Los datos se han restaurado desde Google Drive. Los datos anteriores han sido reemplazados." });
+      }, 0);
+
+    } catch (error: any) {
+      console.error("Error al procesar datos restaurados de Drive:", error);
+      setTimeout(() => {
+        toast({ title: "Error de Restauración", description: `No se pudieron procesar los datos de Google Drive: ${error.message}`, variant: "destructive" });
+      }, 0);
+    }
+  }, [toast]);
+
 
   return (
     <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel }}>
+      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel, restoreFromDrive, updateLastBackupTimestamp }}>
         {children}
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>
@@ -431,3 +459,4 @@ export function useAppDispatch() {
   }
   return context;
 }
+
