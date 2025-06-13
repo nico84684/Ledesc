@@ -1,14 +1,15 @@
 
 'use server';
 /**
- * @fileOverview A placeholder flow for backing up data to Google Drive.
- * - backupDataToDrive - A function that simulates backing up data.
+ * @fileOverview Flow for backing up data to Google Drive.
+ * - backupDataToDrive - A function that handles backing up data.
  * - DriveBackupInput - The input type for the backupDataToDrive function.
  * - DriveBackupOutput - The return type for the backupDataToDrive function.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit'; // Corrected import for Zod from Genkit
+import { z } from 'genkit';
+import { google } from 'googleapis';
 
 const DriveBackupInputSchema = z.object({
   userId: z.string().describe('The ID of the user performing the backup.'),
@@ -29,11 +30,9 @@ export type DriveBackupOutput = z.infer<typeof DriveBackupOutputSchema>;
 
 export async function backupDataToDrive(input: DriveBackupInput): Promise<DriveBackupOutput> {
   console.log(`[backupDataToDrive Function] Called for user: ${input.userEmail}`);
-  if (input.accessToken) {
-    console.log('[backupDataToDrive Function] OAuth Access Token received (first 10 chars):', input.accessToken.substring(0,10));
-  } else {
+  if (!input.accessToken) {
     console.warn('[backupDataToDrive Function] OAuth Access Token NOT received.');
-     return {
+    return {
       success: false,
       message: 'Backup to Google Drive requires a valid OAuth access token. Please sign in again.',
     };
@@ -49,33 +48,111 @@ const _backupDataToDriveFlow = ai.defineFlow(
   },
   async (input) => {
     console.log(`[Genkit Flow: backupDataToDriveFlow] Received backup request for user ID: ${input.userId}, Email: ${input.userEmail}`);
-    console.log(`[Genkit Flow: backupDataToDriveFlow] Purchases data length: ${input.purchasesData.length}`);
-    console.log(`[Genkit Flow: backupDataToDriveFlow] Merchants data length: ${input.merchantsData.length}`);
-    console.log(`[Genkit Flow: backupDataToDriveFlow] Settings data length: ${input.settingsData.length}`);
-    console.log(`[Genkit Flow: backupDataToDriveFlow] AccessToken present: ${!!input.accessToken}`);
+    if (!input.accessToken) {
+        return { success: false, message: 'Critical: Access token missing within the flow execution.' };
+    }
 
-    // TODO: Implement actual Google Drive API interaction here using input.accessToken.
-    // 1. Initialize googleapis.drive({ version: 'v3', auth: yourOAuth2Client })
-    //    yourOAuth2Client should be configured with the accessToken.
-    // 2. Use the Drive API to:
-    //    - Find or create an application-specific folder.
-    //    - Create or update a file (e.g., "ledesc_backup.json" or an Excel file) within that folder.
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: input.accessToken });
+    const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    const APP_FOLDER_NAME = 'LEDESC_App_Backups';
+    const BACKUP_FILE_NAME = `ledesc_backup_${input.userEmail.replace(/[^a-zA-Z0-9]/g, '_')}.json`; // User-specific file name
+    const BACKUP_FILE_MIME_TYPE = 'application/json';
 
-    // Simulate success if token was present, failure otherwise
-    if (input.accessToken) {
-        return {
-        success: true,
-        message: 'Backup to Google Drive simulated successfully with access token. Actual Drive integration is pending.',
-        fileId: `simulated-drive-file-id-${Date.now()}`,
+    let folderId = '';
+    try {
+      console.log(`[Genkit Flow] Searching for Drive folder: ${APP_FOLDER_NAME}`);
+      const folderSearchResponse = await drive.files.list({
+        q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
+        fields: 'files(id)',
+        spaces: 'drive',
+      });
+
+      if (folderSearchResponse.data.files && folderSearchResponse.data.files.length > 0) {
+        folderId = folderSearchResponse.data.files[0].id!;
+        console.log(`[Genkit Flow] Found existing folder with ID: ${folderId}`);
+      } else {
+        console.log(`[Genkit Flow] Folder not found, creating new folder: ${APP_FOLDER_NAME}`);
+        const folderMetadata = {
+          name: APP_FOLDER_NAME,
+          mimeType: 'application/vnd.google-apps.folder',
         };
-    } else {
-        return {
-        success: false,
-        message: 'Simulation failed: Access token was missing in the flow.',
+        const createdFolder = await drive.files.create({
+          resource: folderMetadata,
+          fields: 'id',
+        });
+        folderId = createdFolder.data.id!;
+        console.log(`[Genkit Flow] Created new folder with ID: ${folderId}`);
+      }
+    } catch (error: any) {
+      console.error('[Genkit Flow] Error managing Drive folder:', error);
+      return { success: false, message: `Error managing Google Drive folder: ${error.message}` };
+    }
+
+    const backupDataObject = {
+      purchases: JSON.parse(input.purchasesData),
+      merchants: JSON.parse(input.merchantsData),
+      settings: JSON.parse(input.settingsData),
+      backupMetadata: {
+        timestamp: new Date().toISOString(),
+        userEmail: input.userEmail,
+        appName: "LEDESC",
+      }
+    };
+    const backupJsonString = JSON.stringify(backupDataObject, null, 2); // Pretty print
+
+    let fileIdToUpdate: string | undefined;
+    try {
+      console.log(`[Genkit Flow] Searching for backup file: ${BACKUP_FILE_NAME} in folder ID: ${folderId}`);
+      const fileSearchResponse = await drive.files.list({
+        q: `name='${BACKUP_FILE_NAME}' and '${folderId}' in parents and trashed=false`,
+        fields: 'files(id)',
+        spaces: 'drive',
+      });
+
+      if (fileSearchResponse.data.files && fileSearchResponse.data.files.length > 0) {
+        fileIdToUpdate = fileSearchResponse.data.files[0].id!;
+        console.log(`[Genkit Flow] Found existing backup file with ID: ${fileIdToUpdate}`);
+      } else {
+         console.log(`[Genkit Flow] Backup file not found. Will create a new one.`);
+      }
+    } catch (error: any) {
+      console.warn('[Genkit Flow] Error searching for existing backup file (will attempt to create):', error.message);
+    }
+
+    try {
+      const media = {
+        mimeType: BACKUP_FILE_MIME_TYPE,
+        body: backupJsonString,
+      };
+
+      if (fileIdToUpdate) {
+        console.log(`[Genkit Flow] Updating existing file ID: ${fileIdToUpdate}`);
+        const updatedFile = await drive.files.update({
+          fileId: fileIdToUpdate,
+          media: media,
+          fields: 'id, name, webViewLink',
+        });
+        console.log(`[Genkit Flow] File updated successfully. ID: ${updatedFile.data.id}`);
+        return { success: true, message: `Datos actualizados en Google Drive (${updatedFile.data.name}).`, fileId: updatedFile.data.id! };
+      } else {
+        console.log(`[Genkit Flow] Creating new file: ${BACKUP_FILE_NAME}`);
+        const fileMetadata = {
+          name: BACKUP_FILE_NAME,
+          parents: [folderId],
         };
+        const createdFile = await drive.files.create({
+          resource: fileMetadata,
+          media: media,
+          fields: 'id, name, webViewLink',
+        });
+        console.log(`[Genkit Flow] New file created successfully. ID: ${createdFile.data.id}`);
+        return { success: true, message: `Datos guardados en Google Drive (${createdFile.data.name}).`, fileId: createdFile.data.id! };
+      }
+    } catch (error: any) {
+      console.error('[Genkit Flow] Error creating/updating backup file in Drive:', error);
+      return { success: false, message: `Error al guardar el archivo en Google Drive: ${error.message}` };
     }
   }
 );
-
