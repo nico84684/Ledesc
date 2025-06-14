@@ -15,12 +15,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { CalendarIcon, Image as ImageIcon, Loader2, CheckCircle, MessageSquareText, MapPin, ChevronsUpDown, Check } from 'lucide-react';
+import { CalendarIcon, Loader2, CheckCircle, MessageSquareText, MapPin, ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-import Image from 'next/image';
+// Image component no longer needed for preview
 import type { Merchant } from '@/types';
 
 export function PurchaseForm() {
@@ -29,8 +29,6 @@ export function PurchaseForm() {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
   const form = useForm<PurchaseFormData>({
@@ -41,27 +39,15 @@ export function PurchaseForm() {
       merchantName: '',
       merchantLocation: '',
       description: '',
-      receiptImage: undefined,
+      // receiptImage no longer part of the form
     },
   });
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFileName(file.name);
-      setPreviewUrl(URL.createObjectURL(file));
-      form.setValue('receiptImage', file);
-    } else {
-      setSelectedFileName(null);
-      setPreviewUrl(null);
-      form.setValue('receiptImage', undefined);
-    }
-  };
 
   async function onSubmit(data: PurchaseFormData) {
     setIsSubmitting(true);
     setSubmissionStatus('idle');
     try {
+      // Pass data directly, addPurchaseAction will handle settings
       const result = await addPurchaseAction(data, settings);
 
       if (result.success && result.purchase) {
@@ -71,7 +57,7 @@ export function PurchaseForm() {
           merchantName: result.purchase.merchantName,
           merchantLocation: data.merchantLocation,
           description: result.purchase.description,
-          receiptImageUrl: result.purchase.receiptImageUrl,
+          receiptImageUrl: result.purchase.receiptImageUrl, // This will likely be undefined now
         });
         
         setTimeout(() => {
@@ -84,10 +70,7 @@ export function PurchaseForm() {
           merchantName: '',
           merchantLocation: '',
           description: '',
-          receiptImage: undefined,
         });
-        setSelectedFileName(null);
-        setPreviewUrl(null);
         setSubmissionStatus('success');
       } else {
          setTimeout(() => {
@@ -311,39 +294,7 @@ export function PurchaseForm() {
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="receiptImage"
-              render={({ field }) => ( 
-                <FormItem>
-                  <FormLabel>Imagen del Recibo (Opcional)</FormLabel>
-                  <FormControl>
-                    <div className="flex items-center gap-2">
-                      <Button type="button" variant="outline" asChild className="relative">
-                        <div>
-                          <ImageIcon className="mr-2 h-4 w-4" />
-                          {selectedFileName ? 'Cambiar archivo' : 'Subir archivo'}
-                          <input
-                            type="file"
-                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            accept="image/png, image/jpeg, image/webp"
-                            onChange={handleFileChange}
-                            ref={field.ref} 
-                          />
-                        </div>
-                      </Button>
-                      {selectedFileName && <span className="text-sm text-muted-foreground truncate max-w-[150px]">{selectedFileName}</span>}
-                    </div>
-                  </FormControl>
-                  {previewUrl && (
-                    <div className="mt-2">
-                      <Image src={previewUrl} alt="Vista previa del recibo" width={100} height={100} className="rounded-md object-cover" data-ai-hint="receipt document" />
-                    </div>
-                  )}
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Receipt Image Field Removed */}
 
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? (

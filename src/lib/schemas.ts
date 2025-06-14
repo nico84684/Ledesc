@@ -7,11 +7,7 @@ export const PurchaseFormSchema = z.object({
   merchantName: z.string().min(1, "El nombre del comercio es requerido.").max(100, "El nombre del comercio no puede exceder los 100 caracteres."),
   merchantLocation: z.string().max(150, "La ubicación del comercio no puede exceder los 150 caracteres.").optional(),
   description: z.string().max(250, "La descripción no puede exceder los 250 caracteres.").optional(),
-  receiptImage: z.custom<File | undefined>()
-    .refine(file => file === undefined || file.size <= 5 * 1024 * 1024, `El tamaño máximo del archivo es 5MB.`)
-    .refine(file => file === undefined || ["image/jpeg", "image/png", "image/webp"].includes(file.type),
-      "Solo se permiten formatos .jpg, .png, .webp."
-    ).optional(),
+  // receiptImage field removed
 });
 
 export type PurchaseFormData = z.infer<typeof PurchaseFormSchema>;
@@ -22,8 +18,8 @@ export const SettingsFormSchema = z.object({
   alertThresholdPercentage: z.coerce.number().min(0, "El umbral no puede ser negativo.").max(100, "El umbral no puede ser mayor a 100."),
   autoBackupToDrive: z.boolean(),
   lastBackupTimestamp: z.number().optional(),
-  enableEndOfMonthReminder: z.boolean(), // Nuevo
-  daysBeforeEndOfMonthToRemind: z.coerce.number().min(1, "Debe ser al menos 1 día.").max(15, "No puede exceder los 15 días."), // Nuevo
+  enableEndOfMonthReminder: z.boolean(),
+  daysBeforeEndOfMonthToRemind: z.coerce.number().min(1, "Debe ser al menos 1 día.").max(15, "No puede exceder los 15 días."),
 });
 
 export type SettingsFormData = z.infer<typeof SettingsFormSchema>;

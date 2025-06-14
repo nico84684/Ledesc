@@ -13,11 +13,8 @@ import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput }
 export async function addPurchaseAction(data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
   console.log("Server Action: addPurchaseAction called with data:", data);
   
-  let receiptImageUrl: string | undefined = undefined;
-  if (data.receiptImage && data.receiptImage.size > 0) {
-    const timestamp = Date.now();
-    receiptImageUrl = `https://placehold.co/300x200.png?text=Recibo_${timestamp}&font=roboto`;
-  }
+  // receiptImageUrl is no longer handled here as the image upload is removed
+  const receiptImageUrl: string | undefined = undefined;
 
   const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
   const newPurchase: Purchase = {
@@ -27,7 +24,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
     merchantName: data.merchantName.trim(),
     merchantLocation: data.merchantLocation?.trim() || undefined,
     description: data.description || undefined,
-    receiptImageUrl,
+    receiptImageUrl, // Will be undefined
     discountApplied: parseFloat(discountAmount.toFixed(2)),
     finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
   };
@@ -42,17 +39,21 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
 export async function updateSettingsAction(data: SettingsFormData): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
   console.log("Server Action: updateSettingsAction called with data:", data);
   
-  const newSettings: BenefitSettings = {
+  // Ensure all BenefitSettings fields are included here
+  const updatedSettings: BenefitSettings = {
     monthlyAllowance: data.monthlyAllowance,
     discountPercentage: data.discountPercentage,
     alertThresholdPercentage: data.alertThresholdPercentage,
-    enableWeeklyReminders: data.enableWeeklyReminders,
+    autoBackupToDrive: data.autoBackupToDrive,
+    lastBackupTimestamp: data.lastBackupTimestamp, // Retain existing or new value
+    enableEndOfMonthReminder: data.enableEndOfMonthReminder,
+    daysBeforeEndOfMonthToRemind: data.daysBeforeEndOfMonthToRemind,
   };
 
   revalidatePath('/');
   revalidatePath('/settings');
 
-  return { success: true, message: "Configuración actualizada exitosamente.", settings: newSettings };
+  return { success: true, message: "Configuración actualizada exitosamente.", settings: updatedSettings };
 }
 
 export async function addManualMerchantAction(data: AddMerchantFormData): Promise<{ success: boolean; message: string; merchant?: Merchant }> {
@@ -94,13 +95,8 @@ export async function triggerGoogleDriveBackupAction(
       accessToken,
     };
     const result = await backupDataToDrive(backupInput); 
-    // If backup is successful, update the lastBackupTimestamp in settings
     if (result.success) {
-        // Here, ideally, we would update the settings in the database/store.
-        // For now, we'll rely on the client to update its local settings state
-        // or we could return a new timestamp for the client to use.
-        // However, this action primarily triggers the backup.
-        // The client-side SettingsForm will update its lastBackupTimestamp on successful backup.
+        // Client-side will update lastBackupTimestamp
     }
     return result;
   } catch (error: any) {
@@ -129,8 +125,6 @@ export async function triggerGoogleDriveRestoreAction(
       accessToken,
     };
     const result = await restoreDataFromDrive(restoreInput);
-    // The actual data restoration (updating client state) will happen client-side
-    // using the data returned in 'result'.
     return result;
   } catch (error: any) {
     console.error("Error al disparar el flujo de restauración desde Google Drive (acción del servidor):", error);
