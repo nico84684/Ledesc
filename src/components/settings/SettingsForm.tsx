@@ -81,9 +81,10 @@ export function SettingsForm() {
         setIsInitialSetup(true);
       }
       // Asegurar que todos los campos, incluyendo los nuevos, se resetean correctamente
+      // cuando settings cambia (ej. por un cambio inmediato de switch)
       form.reset({
-        ...DEFAULT_BENEFIT_SETTINGS,
-        ...(settings || {}),
+        ...DEFAULT_BENEFIT_SETTINGS, // Base defaults
+        ...(settings || {}), // Current global settings state
       });
     }
   }, [isInitialized, settings, form]);
@@ -121,15 +122,29 @@ export function SettingsForm() {
     const wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
 
     try {
+      // Los valores de enableEndOfMonthReminder y autoBackupToDrive ya están actualizados en el estado global
+      // pero los enviamos igualmente por si acaso la acción del servidor los necesitara completos.
       const dataToUpdate: BenefitSettings = {
-        ...(settings || DEFAULT_BENEFIT_SETTINGS), // Mantener valores existentes no en el form
-        ...data,
+        ...(settings || DEFAULT_BENEFIT_SETTINGS), // Base del estado global (ya tiene los switches actualizados)
+        monthlyAllowance: data.monthlyAllowance,
+        discountPercentage: data.discountPercentage,
+        alertThresholdPercentage: data.alertThresholdPercentage,
+        daysBeforeEndOfMonthToRemind: data.daysBeforeEndOfMonthToRemind,
+        // enableEndOfMonthReminder and autoBackupToDrive son leídos de `data` que viene del form,
+        // que también se actualiza vía field.onChange
+        enableEndOfMonthReminder: data.enableEndOfMonthReminder,
+        autoBackupToDrive: data.autoBackupToDrive,
       };
-
+      
+      // Llamamos a updateSettingsInStore aquí para los campos que no son switches
+      // ya que los switches actualizan el store inmediatamente.
+      // O, se puede confiar en que `updateSettingsAction` lo haga si esa es la intención,
+      // pero si `updateSettingsAction` no se implementa, esto es necesario.
+      // Para este caso, dejaremos que `updateSettingsAction` actualice el store.
       const result = await updateSettingsAction(dataToUpdate as SettingsFormData); 
       
       if (result.success && result.settings) {
-        updateSettingsInStore(result.settings);
+        updateSettingsInStore(result.settings); // Actualiza el store con la respuesta de la acción
 
         if (wasInitialSetupPending) {
           localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
@@ -140,7 +155,7 @@ export function SettingsForm() {
           });
           router.push('/');
         } else {
-          toast({ title: "Éxito", description: "Configuración actualizada exitosamente." });
+          toast({ title: "Éxito", description: "Configuración principal guardada exitosamente." });
         }
       } else {
         toast({ title: "Error", description: result.message || "No se pudo actualizar la configuración.", variant: 'destructive' });
@@ -204,6 +219,7 @@ export function SettingsForm() {
       const result = await triggerGoogleDriveRestoreAction(user.uid, user.email, accessToken);
       if (result.success && result.purchasesData && result.merchantsData && result.settingsData) {
         restoreFromDrive(result.purchasesData, result.merchantsData, result.settingsData);
+        // No es necesario llamar a form.reset aquí porque el useEffect que depende de [settings] lo hará.
         toast({ title: "Restauración desde Drive Exitosa", description: result.message });
       } else {
         toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o ocurrió un error.", variant: "destructive" });
@@ -285,6 +301,8 @@ export function SettingsForm() {
                     </FormItem>
                   )}
                 />
+                
+                {/* Switch para Recordatorio de Fin de Mes - Aplicación Inmediata */}
                 <FormField
                   control={form.control}
                   name="enableEndOfMonthReminder"
@@ -302,13 +320,18 @@ export function SettingsForm() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked); // Actualiza el estado del formulario
+                            updateSettingsInStore({ enableEndOfMonthReminder: checked }); // Actualiza el estado global inmediatamente
+                            toast({ title: "Configuración Actualizada", description: `Recordatorio de fin de mes ${checked ? 'activado' : 'desactivado'}.`});
+                          }}
                           aria-label="Activar recordatorio de fin de mes"
                         />
                       </FormControl>
                     </FormItem>
                   )}
                 />
+                {/* Campo condicional para días - depende del botón guardar principal */}
                 {watchEnableEndOfMonthReminder && (
                   <FormField
                     control={form.control}
@@ -319,12 +342,14 @@ export function SettingsForm() {
                         <FormControl>
                           <Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
                         </FormControl>
-                        <FormDescription>Se te recordará cuando falten estos días para terminar el mes, si tienes saldo.</FormDescription>
+                        <FormDescription>Se te recordará cuando falten estos días para terminar el mes, si tienes saldo. (Se guarda con el botón principal)</FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 )}
+
+                 {/* Switch para Backup Automático a Drive - Aplicación Inmediata */}
                  <FormField
                   control={form.control}
                   name="autoBackupToDrive"
@@ -339,7 +364,11 @@ export function SettingsForm() {
                       <FormControl>
                         <Switch
                           checked={field.value}
-                          onCheckedChange={field.onChange}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked); // Actualiza el estado del formulario
+                            updateSettingsInStore({ autoBackupToDrive: checked }); // Actualiza el estado global inmediatamente
+                            toast({ title: "Configuración Actualizada", description: `Backup automático a Google Drive ${checked ? 'activado' : 'desactivado'}.`});
+                          }}
                           aria-label="Activar backup automático a Google Drive"
                         />
                       </FormControl>
@@ -349,7 +378,7 @@ export function SettingsForm() {
               </div>
               <Button type="submit" className="w-full" disabled={isSubmittingSettings}>
                 {isSubmittingSettings ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
-                {isSubmittingSettings ? 'Guardando...' : (isInitialSetup ? 'Guardar Configuración Inicial' : 'Guardar Configuración')}
+                {isSubmittingSettings ? 'Guardando...' : (isInitialSetup ? 'Guardar Configuración Inicial' : 'Guardar Configuración Principal')}
               </Button>
             </form>
           </Form>
@@ -369,13 +398,13 @@ export function SettingsForm() {
               <span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup.</span>
             </div>
              {settings?.autoBackupToDrive && user && (
-              <div className="flex items-center mt-2 text-green-700">
+              <div className="flex items-center mt-2 text-green-700 dark:text-green-400">
                 <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                 <span>Backup automático a Google Drive está ACTIVO.</span>
               </div>
             )}
             {settings?.autoBackupToDrive && !user && (
-              <div className="flex items-center mt-2 text-orange-600">
+              <div className="flex items-center mt-2 text-orange-600 dark:text-orange-400">
                 <AlertTriangle className="h-4 w-4 mr-2" />
                 <span>Backup automático activo, pero requiere iniciar sesión con Google.</span>
               </div>
@@ -469,7 +498,7 @@ export function SettingsForm() {
           
           <Separator />
 
-          <div className="flex items-start p-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md">
+          <div className="flex items-start p-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
             <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold">Nota sobre Restauración desde Excel:</span>
@@ -485,3 +514,6 @@ export function SettingsForm() {
     </div>
   );
 }
+
+
+    
