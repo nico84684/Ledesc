@@ -289,7 +289,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
-        updatedExistingMerchant: updatedMerchantFromPurchase,
+        updatedExistingMerchant // Asegurar que esta variable se desestructura correctamente
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
       
       setTimeout(() => {
@@ -580,3 +580,4 @@ export function useAppDispatch() {
   }
   return context;
 }
+
