@@ -69,6 +69,31 @@ const pwaConfig = {
           },
         },
       },
+      // NUEVAS REGLAS para el ícono principal y el manifest
+      {
+        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i, // Cachear el icono principal
+        handler: 'NetworkFirst', // Priorizar la red para obtener la versión más reciente
+        options: {
+          cacheName: 'app-main-icon-cache',
+          expiration: {
+            maxEntries: 5, 
+            maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día (actualizaciones más frecuentes)
+          },
+          networkTimeoutSeconds: 2, // Intentar red por 2 segundos, luego caché
+        },
+      },
+      {
+        urlPattern: /\/manifest\.(?:json|webmanifest)$/i, // Cachear el manifest
+        handler: 'NetworkFirst', // Priorizar la red
+        options: {
+          cacheName: 'app-manifest-cache',
+          expiration: {
+            maxEntries: 2, 
+            maxAgeSeconds: 12 * 60 * 60, // 12 Horas (actualizaciones más frecuentes)
+          },
+          networkTimeoutSeconds: 2,
+        },
+      },
     ],
   },
 };
