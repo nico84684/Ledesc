@@ -11,6 +11,20 @@ const pwaConfig = {
   aggressiveFrontEndNavCaching: true, // Cacheo agresivo de navegaciones (App Router)
   reloadOnOnline: true, // Recarga la página cuando se recupera la conexión
   swcMinify: true, // Habilitar minificación con SWC
+  icons: [ // Especificación explícita de los íconos para el manifest.json
+    {
+      src: '/images/ledesc-icon.png',
+      sizes: '192x192',
+      type: 'image/png',
+      purpose: 'any maskable', // 'any' o 'maskable' o 'any maskable'
+    },
+    {
+      src: '/images/ledesc-icon.png',
+      sizes: '512x512',
+      type: 'image/png',
+      purpose: 'any maskable',
+    },
+  ],
   workboxOptions: {
     disableDevLogs: true, // Deshabilita logs de Workbox en producción
     runtimeCaching: [
@@ -83,4 +97,3 @@ const nextConfig: NextConfig = {
 };
 
 export default withPWA(nextConfig);
-
