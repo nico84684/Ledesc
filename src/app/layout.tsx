@@ -15,7 +15,7 @@ const fontSans = FontSans({
 export const metadata: Metadata = {
   title: APP_NAME,
   description: 'Gestiona tus beneficios gastronómicos de forma sencilla.',
-  manifest: '/manifest.json', // Added manifest link
+  // manifest: '/manifest.json', // Eliminado: next-pwa lo inyecta
 };
 
 export default function RootLayout({
@@ -45,7 +45,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="192x192" href="/images/ledesc-icon.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/images/ledesc-icon.png" />
         
-        {/* Add more icon sizes for apple-touch-icon if needed */}
+        {/* next-pwa inyectará el <link rel="manifest"> aquí */}
       </head>
       <body
         className={cn(

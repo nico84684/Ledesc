@@ -48,7 +48,7 @@ const pwaConfig = {
         urlPattern: ({ request }) => request.destination === 'document',
         handler: 'NetworkFirst',
         options: {
-          cacheName: 'pages-cache',
+          cacheName: 'pages-cache-v2', // Modificado para intentar forzar actualización de SW
           expiration: {
             maxEntries: 30,
             maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
