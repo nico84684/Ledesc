@@ -1,13 +1,13 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
-import type { PluginOptions, RuntimeCachingStrategy } from '@ducanh2912/next-pwa';
+import type { PluginOptions, RuntimeCaching } from '@ducanh2912/next-pwa'; // Changed RuntimeCachingStrategy to RuntimeCaching
 
 // Define the runtimeCaching configuration with explicit types
-const runtimeCachingEntries: RuntimeCachingStrategy[] = [
+const runtimeCachingEntries: RuntimeCaching[] = [ // Changed RuntimeCachingStrategy[] to RuntimeCaching[]
   {
     urlPattern: /^https:\/\/placehold\.co\/.*/i,
-    handler: 'CacheFirst', // TypeScript should infer this as a valid StrategyName due to RuntimeCachingStrategy[]
+    handler: 'CacheFirst' as const,
     options: {
       cacheName: 'placeholder-images',
       expiration: {
@@ -18,7 +18,7 @@ const runtimeCachingEntries: RuntimeCachingStrategy[] = [
   },
   {
     urlPattern: ({ request }: { request: Request }) => request.destination === 'document',
-    handler: 'NetworkFirst',
+    handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'pages-cache-v3',
       expiration: {
@@ -30,7 +30,7 @@ const runtimeCachingEntries: RuntimeCachingStrategy[] = [
   },
   {
     urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
-    handler: 'CacheFirst',
+    handler: 'CacheFirst' as const,
     options: {
       cacheName: 'fonts-cache',
       expiration: {
@@ -41,7 +41,7 @@ const runtimeCachingEntries: RuntimeCachingStrategy[] = [
   },
   {
     urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i,
-    handler: 'NetworkFirst',
+    handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-main-icon-cache',
       expiration: {
@@ -53,7 +53,7 @@ const runtimeCachingEntries: RuntimeCachingStrategy[] = [
   },
   {
     urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
-    handler: 'NetworkFirst',
+    handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-manifest-cache',
       expiration: {
