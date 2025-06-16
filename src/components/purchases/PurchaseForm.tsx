@@ -5,106 +5,111 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { PurchaseFormSchema, type PurchaseFormData } from '@/lib/schemas';
-import { addPurchaseAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // CardFooter removed as not used in this version
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { CalendarIcon, Loader2, CheckCircle, MessageSquareText, MapPin, ChevronsUpDown, Check } from 'lucide-react';
+import { CalendarIcon, Loader2, CheckCircle, MessageSquareText, MapPin, ChevronsUpDown, Check, Save } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
-// Image component no longer needed for preview
-import type { Merchant } from '@/types';
+import type { Merchant, Purchase } from '@/types';
 
-export function PurchaseForm() {
-  const { addPurchase: addPurchaseToStore } = useAppDispatch();
-  const { settings, merchants } = useAppState();
+interface PurchaseFormProps {
+  isEditMode?: boolean;
+  initialData?: Purchase; // Use full Purchase type for initialData in edit mode
+  onSubmitPurchase: (data: PurchaseFormData, purchaseId?: string) => Promise<{success: boolean, message: string}>;
+  onCancel?: () => void; // For closing dialog/modal
+  className?: string;
+}
+
+export function PurchaseForm({ 
+  isEditMode = false, 
+  initialData, 
+  onSubmitPurchase,
+  onCancel,
+  className 
+}: PurchaseFormProps) {
+  const { settings, merchants } = useAppState(); // Get settings for discount calculation preview if needed
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [comboboxOpen, setComboboxOpen] = useState(false);
 
+  const formDefaultValues: PurchaseFormData = {
+    amount: (initialData?.amount as unknown as number) ?? ('' as unknown as number),
+    date: initialData?.date ? format(parseISO(initialData.date), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx") : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+    merchantName: initialData?.merchantName ?? '',
+    merchantLocation: initialData?.merchantLocation ?? '',
+    description: initialData?.description ?? '',
+  };
+  
   const form = useForm<PurchaseFormData>({
     resolver: zodResolver(PurchaseFormSchema),
-    defaultValues: {
-      amount: '' as unknown as number,
-      date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-      merchantName: '',
-      merchantLocation: '',
-      description: '',
-      // receiptImage no longer part of the form
-    },
+    defaultValues: formDefaultValues,
   });
 
-  async function onSubmit(data: PurchaseFormData) {
+  useEffect(() => {
+    if (initialData) {
+      form.reset({
+        amount: initialData.amount,
+        date: initialData.date ? format(parseISO(initialData.date), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx") : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+        merchantName: initialData.merchantName,
+        merchantLocation: initialData.merchantLocation || '',
+        description: initialData.description || '',
+      });
+    }
+  }, [initialData, form]);
+
+
+  async function handleSubmit(data: PurchaseFormData) {
     setIsSubmitting(true);
-    setSubmissionStatus('idle');
     try {
-      // Pass data directly, addPurchaseAction will handle settings
-      const result = await addPurchaseAction(data, settings);
-
-      if (result.success && result.purchase) {
-        addPurchaseToStore({
-          amount: result.purchase.amount,
-          date: result.purchase.date,
-          merchantName: result.purchase.merchantName,
-          merchantLocation: data.merchantLocation,
-          description: result.purchase.description,
-          receiptImageUrl: result.purchase.receiptImageUrl, // This will likely be undefined now
-        });
-        
-        setTimeout(() => {
-          toast({ title: "Éxito", description: result.message, variant: 'default' });
-        }, 0);
-
-        form.reset({
-          amount: '' as unknown as number,
-          date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
-          merchantName: '',
-          merchantLocation: '',
-          description: '',
-        });
-        setSubmissionStatus('success');
+      const result = await onSubmitPurchase(data, initialData?.id);
+      
+      if (result.success) {
+        toast({ title: isEditMode ? "Actualización Exitosa" : "Registro Exitoso", description: result.message });
+        if (!isEditMode) {
+          form.reset({
+            amount: '' as unknown as number,
+            date: format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
+            merchantName: '',
+            merchantLocation: '',
+            description: '',
+          });
+        }
+        onCancel?.(); // Close dialog/modal on success
       } else {
-         setTimeout(() => {
-          toast({ title: "Error", description: result.message, variant: 'destructive' });
-        }, 0);
-        setSubmissionStatus('error');
+        toast({ title: isEditMode ? "Error al Actualizar" : "Error al Registrar", description: result.message, variant: 'destructive' });
       }
     } catch (error) {
-       setTimeout(() => {
-        toast({ title: "Error Inesperado", description: "Ocurrió un error al registrar la compra.", variant: 'destructive' });
-      }, 0);
-      setSubmissionStatus('error');
+      toast({ title: "Error Inesperado", description: `Ocurrió un error al ${isEditMode ? 'actualizar' : 'registrar'} la compra.`, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  useEffect(() => {
-    if (submissionStatus === 'success' || submissionStatus === 'error') {
-      const timer = setTimeout(() => setSubmissionStatus('idle'), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [submissionStatus]);
-
+  const cardTitle = isEditMode ? "Editar Compra" : "Registrar Nueva Compra";
+  const cardDescription = isEditMode ? "Modifica los detalles de la compra." : "Completa los detalles de tu compra gastronómica.";
+  const buttonIcon = isEditMode ? <Save className="mr-2 h-4 w-4" /> : <CheckCircle className="mr-2 h-4 w-4" />;
+  const buttonText = isEditMode ? 'Guardar Cambios' : 'Registrar Compra';
 
   return (
-    <Card className="w-full max-w-lg mx-auto shadow-lg">
-      <CardHeader>
-        <CardTitle className="text-2xl">Registrar Nueva Compra</CardTitle>
-        <CardDescription>Completa los detalles de tu compra gastronómica.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <Card className={cn("w-full shadow-lg", className, isEditMode ? 'border-0 shadow-none' : 'max-w-lg mx-auto')}>
+      {!isEditMode && (
+        <CardHeader>
+          <CardTitle className="text-2xl">{cardTitle}</CardTitle>
+          <CardDescription>{cardDescription}</CardDescription>
+        </CardHeader>
+      )}
+      <CardContent className={cn(isEditMode && "p-0")}>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <FormField
               control={form.control}
               name="amount"
@@ -190,7 +195,8 @@ export function PurchaseForm() {
                           <span className="truncate">
                             {field.value
                               ? merchants.find(
-                                  (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase()
+                                  (merchant) => merchant.name.toLowerCase() === field.value.toLowerCase() &&
+                                                 (merchant.location || '').toLowerCase() === (form.getValues('merchantLocation') || '').toLowerCase()
                                 )?.name ?? field.value 
                               : "Seleccionar o escribir comercio..."}
                           </span>
@@ -205,8 +211,9 @@ export function PurchaseForm() {
                           value={field.value || ''}
                           onValueChange={(currentValue) => {
                             field.onChange(currentValue);
+                            // Check if typed value matches an existing merchant to auto-fill location
                             const matchedMerchant = merchants.find(m => m.name.toLowerCase() === currentValue.toLowerCase());
-                            if (matchedMerchant) {
+                            if (matchedMerchant && !form.getValues('merchantLocation')) { // Only fill if location is empty
                                 form.setValue('merchantLocation', matchedMerchant.location || '');
                             }
                           }}
@@ -219,7 +226,7 @@ export function PurchaseForm() {
                             {merchants.map((merchant: Merchant) => (
                               <CommandItem
                                 key={merchant.id}
-                                value={merchant.name}
+                                value={`${merchant.name}${merchant.location ? ` (${merchant.location})` : ''}`}
                                 onSelect={() => {
                                   form.setValue("merchantName", merchant.name);
                                   form.setValue("merchantLocation", merchant.location || "");
@@ -229,7 +236,8 @@ export function PurchaseForm() {
                                 <Check
                                   className={cn(
                                     "mr-2 h-4 w-4",
-                                    field.value && field.value.toLowerCase() === merchant.name.toLowerCase()
+                                    field.value && field.value.toLowerCase() === merchant.name.toLowerCase() &&
+                                    (form.getValues('merchantLocation') || '').toLowerCase() === (merchant.location || '').toLowerCase()
                                       ? "opacity-100"
                                       : "opacity-0"
                                   )}
@@ -293,30 +301,24 @@ export function PurchaseForm() {
                 </FormItem>
               )}
             />
-
-            {/* Receipt Image Field Removed */}
-
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <CheckCircle className="mr-2 h-4 w-4" />
+            <div className={cn("flex gap-2", isEditMode ? "justify-end" : "justify-start")}>
+              {isEditMode && onCancel && (
+                 <Button type="button" variant="outline" onClick={onCancel} disabled={isSubmitting}>
+                   Cancelar
+                 </Button>
               )}
-              {isSubmitting ? 'Registrando...' : 'Registrar Compra'}
-            </Button>
+              <Button type="submit" className={cn(!isEditMode && "w-full")} disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  buttonIcon
+                )}
+                {isSubmitting ? (isEditMode ? 'Guardando...' : 'Registrando...') : buttonText}
+              </Button>
+            </div>
           </form>
         </Form>
       </CardContent>
-      {submissionStatus === 'success' && (
-        <CardFooter>
-          <p className="text-sm text-green-600">Compra registrada exitosamente.</p>
-        </CardFooter>
-      )}
-      {submissionStatus === 'error' && (
-        <CardFooter>
-          <p className="text-sm text-destructive">Error al registrar la compra. Inténtalo de nuevo.</p>
-        </CardFooter>
-      )}
     </Card>
   );
 }

@@ -13,7 +13,6 @@ import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput }
 export async function addPurchaseAction(data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
   console.log("Server Action: addPurchaseAction called with data:", data);
   
-  // receiptImageUrl is no longer handled here as the image upload is removed
   const receiptImageUrl: string | undefined = undefined;
 
   const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
@@ -24,7 +23,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
     merchantName: data.merchantName.trim(),
     merchantLocation: data.merchantLocation?.trim() || undefined,
     description: data.description || undefined,
-    receiptImageUrl, // Will be undefined
+    receiptImageUrl,
     discountApplied: parseFloat(discountAmount.toFixed(2)),
     finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
   };
@@ -36,16 +35,51 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
   return { success: true, message: "Compra registrada exitosamente.", purchase: newPurchase };
 }
 
+export async function editPurchaseAction(purchaseId: string, data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
+  console.log("Server Action: editPurchaseAction called for ID:", purchaseId, "with data:", data);
+
+  const receiptImageUrl: string | undefined = undefined; // Asumimos que no se edita la imagen o se maneja por separado
+
+  const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
+  const updatedPurchase: Purchase = {
+    id: purchaseId, // El ID no cambia
+    amount: data.amount,
+    date: data.date,
+    merchantName: data.merchantName.trim(),
+    merchantLocation: data.merchantLocation?.trim() || undefined,
+    description: data.description || undefined,
+    receiptImageUrl,
+    discountApplied: parseFloat(discountAmount.toFixed(2)),
+    finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
+  };
+
+  revalidatePath('/');
+  revalidatePath('/history');
+  revalidatePath('/merchants');
+
+  return { success: true, message: "Compra actualizada exitosamente.", purchase: updatedPurchase };
+}
+
+export async function deletePurchaseAction(purchaseId: string): Promise<{ success: boolean; message: string; purchaseId?: string }> {
+  console.log("Server Action: deletePurchaseAction called for ID:", purchaseId);
+
+  revalidatePath('/');
+  revalidatePath('/history');
+  revalidatePath('/merchants');
+
+  return { success: true, message: "Compra eliminada exitosamente.", purchaseId };
+}
+
+
 export async function updateSettingsAction(data: SettingsFormData): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
   console.log("Server Action: updateSettingsAction called with data:", data);
   
-  // Ensure all BenefitSettings fields are included here
   const updatedSettings: BenefitSettings = {
     monthlyAllowance: data.monthlyAllowance,
     discountPercentage: data.discountPercentage,
     alertThresholdPercentage: data.alertThresholdPercentage,
     autoBackupToDrive: data.autoBackupToDrive,
-    lastBackupTimestamp: data.lastBackupTimestamp, // Retain existing or new value
+    lastBackupTimestamp: data.lastBackupTimestamp,
     enableEndOfMonthReminder: data.enableEndOfMonthReminder,
     daysBeforeEndOfMonthToRemind: data.daysBeforeEndOfMonthToRemind,
   };
@@ -131,3 +165,4 @@ export async function triggerGoogleDriveRestoreAction(
     return { success: false, message: error.message || "Falló al disparar la restauración desde Google Drive." };
   }
 }
+

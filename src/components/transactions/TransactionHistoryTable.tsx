@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppState, useAppDispatch } from '@/lib/store';
 import type { Purchase } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Receipt, MessageSquareText } from 'lucide-react';
+import { Download, FilterX, CalendarDays, Store, Tag, Receipt, MessageSquareText, Edit3, Trash2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import Image from 'next/image';
@@ -20,26 +20,46 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-
+import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog'; // Import EditPurchaseDialog
+import { deletePurchaseAction } from '@/lib/actions';
+import { useToast } from '@/hooks/use-toast';
 
 const ITEMS_PER_PAGE = 10;
-const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; // Special non-empty value
+const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
 
 export function TransactionHistoryTable() {
   const { purchases, settings } = useAppState();
-  const { exportToCSV, isInitialized } = useAppDispatch();
-  const [filterMonth, setFilterMonth] = useState<string>(''); // "" means all months
+  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStore } = useAppDispatch();
+  const { toast } = useToast();
+  
+  const [filterMonth, setFilterMonth] = useState<string>('');
   const [filterMerchant, setFilterMerchant] = useState<string>('');
   const [filterAmount, setFilterAmount] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
 
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [selectedPurchaseForEdit, setSelectedPurchaseForEdit] = useState<Purchase | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+
   const uniqueMonths = useMemo(() => {
     const months = new Set<string>();
     purchases.forEach(p => months.add(format(parseISO(p.date), 'yyyy-MM')));
-    return Array.from(months).sort((a, b) => b.localeCompare(a)); // Sort descending
+    return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [purchases]);
 
   const uniqueMerchants = useMemo(() => {
@@ -55,7 +75,7 @@ export function TransactionHistoryTable() {
       const matchesMerchant = filterMerchant ? p.merchantName.toLowerCase().includes(filterMerchant.toLowerCase()) : true;
       const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true;
       return matchesMonth && matchesMerchant && matchesAmount;
-    });
+    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); //Ensure consistent sort
   }, [purchases, filterMonth, filterMerchant, filterAmount]);
 
   const paginatedPurchases = useMemo(() => {
@@ -76,6 +96,29 @@ export function TransactionHistoryTable() {
     return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
   };
 
+  const handleEditClick = (purchase: Purchase) => {
+    setSelectedPurchaseForEdit(purchase);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleDeletePurchase = async (purchaseId: string) => {
+    setIsDeleting(true);
+    try {
+      const result = await deletePurchaseAction(purchaseId);
+      if (result.success) {
+        deletePurchaseFromStore(purchaseId);
+        toast({ title: "Éxito", description: result.message });
+      } else {
+        toast({ title: "Error", description: result.message, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Error Inesperado", description: "No se pudo eliminar la compra.", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+
   if (!isInitialized) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -95,7 +138,7 @@ export function TransactionHistoryTable() {
             value={filterMonth === "" ? ALL_MONTHS_FILTER_VALUE : filterMonth}
             onValueChange={(value) => {
               setFilterMonth(value === ALL_MONTHS_FILTER_VALUE ? "" : value);
-              setCurrentPage(1); // Reset to first page on filter change
+              setCurrentPage(1);
             }}
           >
             <SelectTrigger id="filter-month">
@@ -119,7 +162,7 @@ export function TransactionHistoryTable() {
             value={filterMerchant}
             onChange={e => {
               setFilterMerchant(e.target.value);
-              setCurrentPage(1); // Reset to first page
+              setCurrentPage(1);
             }}
           />
         </div>
@@ -132,7 +175,7 @@ export function TransactionHistoryTable() {
             value={filterAmount}
             onChange={e => {
               setFilterAmount(e.target.value);
-              setCurrentPage(1); // Reset to first page
+              setCurrentPage(1);
             }}
           />
         </div>
@@ -168,6 +211,7 @@ export function TransactionHistoryTable() {
                 <TableHead className="text-right">Descuento</TableHead>
                 <TableHead className="text-right">Monto Final</TableHead>
                 <TableHead className="text-center">Recibo</TableHead>
+                <TableHead className="text-center">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -192,7 +236,7 @@ export function TransactionHistoryTable() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">{formatCurrency(purchase.amount)}</TableCell>
-                  <TableCell className="text-right text-green-600">-{formatCurrency(purchase.discountApplied)}</TableCell>
+                  <TableCell className="text-right text-green-600 dark:text-green-400">-{formatCurrency(purchase.discountApplied)}</TableCell>
                   <TableCell className="text-right font-semibold">{formatCurrency(purchase.finalAmount)}</TableCell>
                   <TableCell className="text-center">
                     {purchase.receiptImageUrl ? (
@@ -215,6 +259,47 @@ export function TransactionHistoryTable() {
                     ) : (
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center space-x-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(purchase)}>
+                            <Edit3 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Editar Compra</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Esta acción no se puede deshacer. Esto eliminará permanentemente la compra de
+                              "{purchase.merchantName}" por {formatCurrency(purchase.finalAmount)} del {format(parseISO(purchase.date), 'dd/MM/yyyy')}.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeletePurchase(purchase.id)}
+                              disabled={isDeleting}
+                              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                            >
+                              {isDeleting ? <LoadingSpinner size={16} className="mr-2" /> : null}
+                              Eliminar
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -245,6 +330,17 @@ export function TransactionHistoryTable() {
             Siguiente
           </Button>
         </div>
+      )}
+
+      {selectedPurchaseForEdit && (
+        <EditPurchaseDialog
+          purchase={selectedPurchaseForEdit}
+          isOpen={isEditDialogOpen}
+          onOpenChange={(open) => {
+            setIsEditDialogOpen(open);
+            if (!open) setSelectedPurchaseForEdit(null);
+          }}
+        />
       )}
     </div>
     </TooltipProvider>
