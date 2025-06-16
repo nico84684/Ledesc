@@ -16,48 +16,41 @@ const pwaConfig = {
       src: '/images/ledesc-icon.png',
       sizes: '192x192',
       type: 'image/png',
-      purpose: 'any', // Cambiado de 'any maskable' a 'any'
+      purpose: 'any',
     },
     {
       src: '/images/ledesc-icon.png',
       sizes: '512x512',
       type: 'image/png',
-      purpose: 'any', // Cambiado de 'any maskable' a 'any'
+      purpose: 'any',
     },
   ],
   workboxOptions: {
     disableDevLogs: true, // Deshabilita logs de Workbox en producción
     runtimeCaching: [
       {
-        // Cachear imágenes de placehold.co
-        // Se usa CacheFirst porque estas imágenes de placeholder no cambian.
         urlPattern: /^https:\/\/placehold\.co\/.*/i,
         handler: 'CacheFirst',
         options: {
           cacheName: 'placeholder-images',
           expiration: {
-            maxEntries: 200, // Puede haber muchos recibos
+            maxEntries: 200,
             maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
           },
         },
       },
       {
-        // Cachear las páginas HTML/documentos de navegación.
-        // NetworkFirst asegura que el usuario obtenga la versión más reciente si está online,
-        // pero sirve desde caché si está offline o la red es lenta.
         urlPattern: ({ request }) => request.destination === 'document',
         handler: 'NetworkFirst',
         options: {
-          cacheName: 'pages-cache-v2', // Modificado para intentar forzar actualización de SW
+          cacheName: 'pages-cache-v3', // Nombre de caché modificado para intentar forzar actualización
           expiration: {
             maxEntries: 30,
             maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
           },
-          networkTimeoutSeconds: 3, // Intenta la red por 3 segundos, luego usa caché
+          networkTimeoutSeconds: 3,
         },
       },
-      // Las fuentes de Google (si se usan directamente) o fuentes auto-alojadas por next/font
-      // se pueden cachear aquí también. next/font ya optimiza esto bastante bien.
       {
         urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
         handler: 'CacheFirst',
@@ -69,27 +62,26 @@ const pwaConfig = {
           },
         },
       },
-      // NUEVAS REGLAS para el ícono principal y el manifest
       {
-        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i, // Cachear el icono principal
-        handler: 'NetworkFirst', // Priorizar la red para obtener la versión más reciente
+        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i,
+        handler: 'NetworkFirst',
         options: {
           cacheName: 'app-main-icon-cache',
           expiration: {
             maxEntries: 5, 
-            maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día (actualizaciones más frecuentes)
+            maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día
           },
-          networkTimeoutSeconds: 2, // Intentar red por 2 segundos, luego caché
+          networkTimeoutSeconds: 2,
         },
       },
       {
-        urlPattern: /\/manifest\.(?:json|webmanifest)$/i, // Cachear el manifest
-        handler: 'NetworkFirst', // Priorizar la red
+        urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
+        handler: 'NetworkFirst',
         options: {
           cacheName: 'app-manifest-cache',
           expiration: {
             maxEntries: 2, 
-            maxAgeSeconds: 12 * 60 * 60, // 12 Horas (actualizaciones más frecuentes)
+            maxAgeSeconds: 12 * 60 * 60, // 12 Horas
           },
           networkTimeoutSeconds: 2,
         },
@@ -103,10 +95,10 @@ const withPWA = withPWAInit(pwaConfig);
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Cambiado a false
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Cambiado a false
   },
   images: {
     remotePatterns: [
@@ -117,7 +109,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    unoptimized: true, // Mantenemos esto por ahora, según diagnóstico previo.
+    unoptimized: true,
   },
 };
 
