@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -24,6 +23,9 @@ export function EditPurchaseDialog({ purchase, isOpen, onOpenChange }: EditPurch
   const handleEditSubmit = async (data: PurchaseFormData, purchaseId?: string): Promise<{success: boolean, message: string}> => {
     if (!purchaseId) {
         return { success: false, message: "ID de compra no encontrado para la edición."};
+    }
+    if (!settings) {
+        return { success: false, message: "Error: Configuración no disponible para editar."};
     }
     try {
       const result = await editPurchaseAction(purchaseId, data, settings);

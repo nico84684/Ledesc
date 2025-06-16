@@ -1,4 +1,3 @@
-
 // This file contains server actions.
 // For this prototype, they will interact with the client-side store via context/hooks.
 // In a real application, these would interact with a database.
@@ -165,4 +164,3 @@ export async function triggerGoogleDriveRestoreAction(
     return { success: false, message: error.message || "Falló al disparar la restauración desde Google Drive." };
   }
 }
-
