@@ -1,8 +1,71 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
+import type { PluginOptions, RuntimeCachingStrategy } from '@ducanh2912/next-pwa';
 
-const pwaConfig = {
+// Define the runtimeCaching configuration with explicit types
+const runtimeCachingEntries: RuntimeCachingStrategy[] = [
+  {
+    urlPattern: /^https:\/\/placehold\.co\/.*/i,
+    handler: 'CacheFirst', // TypeScript should infer this as a valid StrategyName due to RuntimeCachingStrategy[]
+    options: {
+      cacheName: 'placeholder-images',
+      expiration: {
+        maxEntries: 200,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
+      },
+    },
+  },
+  {
+    urlPattern: ({ request }: { request: Request }) => request.destination === 'document',
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'pages-cache-v3',
+      expiration: {
+        maxEntries: 30,
+        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
+      },
+      networkTimeoutSeconds: 3,
+    },
+  },
+  {
+    urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
+    handler: 'CacheFirst',
+    options: {
+      cacheName: 'fonts-cache',
+      expiration: {
+        maxEntries: 10,
+        maxAgeSeconds: 365 * 24 * 60 * 60, // 1 Año
+      },
+    },
+  },
+  {
+    urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'app-main-icon-cache',
+      expiration: {
+        maxEntries: 5,
+        maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día
+      },
+      networkTimeoutSeconds: 2,
+    },
+  },
+  {
+    urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
+    handler: 'NetworkFirst',
+    options: {
+      cacheName: 'app-manifest-cache',
+      expiration: {
+        maxEntries: 2,
+        maxAgeSeconds: 12 * 60 * 60, // 12 Horas
+      },
+      networkTimeoutSeconds: 2,
+    },
+  },
+];
+
+const pwaConfig: PluginOptions = {
   dest: 'public',
   disable: false, // Habilitar PWA incluso en desarrollo para pruebas en Firebase Studio
   register: true, // Registra el service worker
@@ -24,7 +87,7 @@ const pwaConfig = {
         src: '/images/ledesc-icon.png', // Asegúrate que esta ruta es correcta desde la carpeta public
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'any', 
+        purpose: 'any',
       },
       {
         src: '/images/ledesc-icon.png',
@@ -36,66 +99,7 @@ const pwaConfig = {
   },
   workboxOptions: {
     disableDevLogs: true, // Deshabilita logs de Workbox en producción
-    runtimeCaching: [
-      {
-        urlPattern: /^https:\/\/placehold\.co\/.*/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'placeholder-images',
-          expiration: {
-            maxEntries: 200,
-            maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
-          },
-        },
-      },
-      {
-        urlPattern: ({ request }: { request: Request }) => request.destination === 'document',
-        handler: 'NetworkFirst',
-        options: {
-          cacheName: 'pages-cache-v3', 
-          expiration: {
-            maxEntries: 30,
-            maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
-          },
-          networkTimeoutSeconds: 3,
-        },
-      },
-      {
-        urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
-        handler: 'CacheFirst',
-        options: {
-          cacheName: 'fonts-cache',
-          expiration: {
-            maxEntries: 10,
-            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 Año
-          },
-        },
-      },
-      {
-        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i, // Cacheo para el ícono principal
-        handler: 'NetworkFirst', // Intenta obtener el más nuevo primero
-        options: {
-          cacheName: 'app-main-icon-cache',
-          expiration: {
-            maxEntries: 5, 
-            maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día
-          },
-          networkTimeoutSeconds: 2,
-        },
-      },
-      {
-        urlPattern: /\/manifest\.(?:json|webmanifest)$/i, // Cacheo para el manifest
-        handler: 'NetworkFirst', // Intenta obtener el más nuevo primero
-        options: {
-          cacheName: 'app-manifest-cache',
-          expiration: {
-            maxEntries: 2, 
-            maxAgeSeconds: 12 * 60 * 60, // 12 Horas
-          },
-          networkTimeoutSeconds: 2,
-        },
-      },
-    ],
+    runtimeCaching: runtimeCachingEntries,
   },
 };
 
@@ -107,7 +111,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: false, 
+    ignoreDuringBuilds: false,
   },
   images: {
     remotePatterns: [
