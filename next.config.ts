@@ -1,10 +1,10 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
-import type { PluginOptions, RuntimeCaching } from '@ducanh2912/next-pwa'; // Changed RuntimeCachingStrategy to RuntimeCaching
+// Tipos PluginOptions y RuntimeCaching eliminados de la importación directa
 
-// Define the runtimeCaching configuration with explicit types
-const runtimeCachingEntries: RuntimeCaching[] = [ // Changed RuntimeCachingStrategy[] to RuntimeCaching[]
+// Define the runtimeCaching configuration with explicit types for its content
+const runtimeCachingEntries = [ // Ya no se anota explícitamente como RuntimeCaching[] aquí
   {
     urlPattern: /^https:\/\/placehold\.co\/.*/i,
     handler: 'CacheFirst' as const,
@@ -65,7 +65,7 @@ const runtimeCachingEntries: RuntimeCaching[] = [ // Changed RuntimeCachingStrat
   },
 ];
 
-const pwaConfig: PluginOptions = {
+const pwaConfig = { // Ya no se anota explícitamente como PluginOptions aquí
   dest: 'public',
   disable: false, // Habilitar PWA incluso en desarrollo para pruebas en Firebase Studio
   register: true, // Registra el service worker
