@@ -87,13 +87,13 @@ const pwaConfig = { // Ya no se anota explícitamente como PluginOptions aquí
         src: '/images/ledesc-icon.png', // Asegúrate que esta ruta es correcta desde la carpeta public
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'any',
+        purpose: 'any maskable', // Modificado
       },
       {
         src: '/images/ledesc-icon.png',
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any',
+        purpose: 'any maskable', // Modificado
       },
     ],
   },
