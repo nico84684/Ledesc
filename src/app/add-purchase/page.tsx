@@ -1,18 +1,22 @@
 "use client";
 
 import { PurchaseForm } from '@/components/purchases/PurchaseForm';
-import { APP_NAME } from '@/config/constants';
+// APP_NAME can be imported if needed for other parts of the component, but not for metadata here.
+// import { APP_NAME } from '@/config/constants'; 
 import { addPurchaseAction } from '@/lib/actions';
 import { useAppState, useAppDispatch } from '@/lib/store';
-import { useToast } from '@/hooks/use-toast';
 import type { PurchaseFormData } from '@/lib/schemas';
-import type { Metadata } from 'next'; // Import Metadata
+// Metadata import removed as it's no longer exported here.
+// import type { Metadata } from 'next'; 
 
-// Static metadata can still be exported from a page file that uses "use client"
-export const metadata: Metadata = {
-  title: `Registrar Compra - ${APP_NAME}`,
-  description: 'Registra una nueva compra gastronómica.',
-};
+// Metadata cannot be exported from a client component.
+// If metadata is needed for this route, it should be defined in a parent layout
+// or the page should be a server component using generateMetadata.
+//
+// export const metadata: Metadata = {
+//   title: `Registrar Compra - ${APP_NAME}`,
+//   description: 'Registra una nueva compra gastronómica.',
+// };
 
 export default function AddPurchasePage() {
   const { settings } = useAppState();
