@@ -11,20 +11,29 @@ const pwaConfig = {
   aggressiveFrontEndNavCaching: true, // Cacheo agresivo de navegaciones (App Router)
   reloadOnOnline: true, // Recarga la página cuando se recupera la conexión
   swcMinify: true, // Habilitar minificación con SWC
-  icons: [ // Especificación explícita de los íconos para el manifest.json
-    {
-      src: '/images/ledesc-icon.png',
-      sizes: '192x192',
-      type: 'image/png',
-      purpose: 'any',
-    },
-    {
-      src: '/images/ledesc-icon.png',
-      sizes: '512x512',
-      type: 'image/png',
-      purpose: 'any',
-    },
-  ],
+  manifest: { // Configuración explícita del manifiesto
+    name: 'LEDESC',
+    short_name: 'LEDESC',
+    description: 'Gestiona tus beneficios gastronómicos de forma sencilla.',
+    start_url: '/',
+    display: 'standalone',
+    background_color: '#F0F4F5', // Corresponde a --background en globals.css
+    theme_color: '#73A8B8',     // Corresponde a --primary en globals.css y meta theme-color
+    icons: [
+      {
+        src: '/images/ledesc-icon.png', // Asegúrate que esta ruta es correcta desde la carpeta public
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any', 
+      },
+      {
+        src: '/images/ledesc-icon.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+    ],
+  },
   workboxOptions: {
     disableDevLogs: true, // Deshabilita logs de Workbox en producción
     runtimeCaching: [
@@ -43,7 +52,7 @@ const pwaConfig = {
         urlPattern: ({ request }) => request.destination === 'document',
         handler: 'NetworkFirst',
         options: {
-          cacheName: 'pages-cache-v3', // Nombre de caché modificado para intentar forzar actualización
+          cacheName: 'pages-cache-v3', 
           expiration: {
             maxEntries: 30,
             maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
@@ -63,8 +72,8 @@ const pwaConfig = {
         },
       },
       {
-        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i,
-        handler: 'NetworkFirst',
+        urlPattern: /\/images\/ledesc-icon\.(?:png|ico|svg)$/i, // Cacheo para el ícono principal
+        handler: 'NetworkFirst', // Intenta obtener el más nuevo primero
         options: {
           cacheName: 'app-main-icon-cache',
           expiration: {
@@ -75,8 +84,8 @@ const pwaConfig = {
         },
       },
       {
-        urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
-        handler: 'NetworkFirst',
+        urlPattern: /\/manifest\.(?:json|webmanifest)$/i, // Cacheo para el manifest
+        handler: 'NetworkFirst', // Intenta obtener el más nuevo primero
         options: {
           cacheName: 'app-manifest-cache',
           expiration: {
@@ -95,10 +104,10 @@ const withPWA = withPWAInit(pwaConfig);
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
-    ignoreBuildErrors: false, // Cambiado a false
+    ignoreBuildErrors: false,
   },
   eslint: {
-    ignoreDuringBuilds: false, // Cambiado a false
+    ignoreDuringBuilds: false, 
   },
   images: {
     remotePatterns: [
@@ -109,7 +118,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    unoptimized: true,
+    unoptimized: true, // Generalmente recomendado para PWAs para evitar problemas con next/image y SW
   },
 };
 
