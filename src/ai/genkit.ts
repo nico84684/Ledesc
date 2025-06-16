@@ -1,8 +1,8 @@
 
-import {genkit, type PluginProvider} from 'genkit';
+import {genkit} from 'genkit'; // Removed 'type PluginProvider'
 import {googleAI} from '@genkit-ai/googleai';
 
-const plugins: PluginProvider[] = [];
+const plugins: any[] = []; // Changed PluginProvider[] to any[]
 
 // Lee la API key de las variables de entorno
 const apiKeyCandidate = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -21,7 +21,7 @@ if (apiKey) {
 }
 
 // Configuración explícita para Genkit
-const genkitConfig: { plugins: PluginProvider[]; model?: string } = {
+const genkitConfig: { plugins: any[]; model?: string } = { // Changed PluginProvider[] to any[]
   plugins,
 };
 
@@ -31,3 +31,4 @@ if (apiKey) {
 }
 
 export const ai = genkit(genkitConfig);
+
