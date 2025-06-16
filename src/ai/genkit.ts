@@ -1,34 +1,33 @@
 
 import {genkit, type PluginProvider} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import dotenv from 'dotenv';
-
-dotenv.config(); // Cargar variables de entorno desde .env (si existe)
 
 const plugins: PluginProvider[] = [];
 
-const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+// Lee la API key de las variables de entorno
+const apiKeyCandidate = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+// Asegura que la apiKey sea una cadena no vacía, o undefined si no es válida
+const apiKey = (apiKeyCandidate && apiKeyCandidate.trim() !== '') ? apiKeyCandidate.trim() : undefined;
 
 if (apiKey) {
   plugins.push(googleAI({ apiKey }));
-  console.log('[Genkit Init] Google AI plugin loaded with API key.');
+  // El console.log de éxito fue eliminado previamente para reducir logs
 } else {
   console.warn(
-    '[Genkit Init] GEMINI_API_KEY o GOOGLE_API_KEY no encontradas en las variables de entorno. ' +
-    'Los flujos dependientes de Google AI (Gemini) no funcionarán. ' +
-    'El flujo de backup a Google Drive debería funcionar si no utiliza modelos generativos.'
+    '[Genkit Init] GEMINI_API_KEY o GOOGLE_API_KEY no encontradas o están vacías en las variables de entorno. ' +
+    'Los flujos que dependen directamente de modelos de GenAI (como Gemini) no funcionarán. ' +
+    'Los flujos de backup/restauración a Google Drive, que usan la API de Drive directamente, deberían funcionar si la autenticación OAuth es correcta.'
   );
 }
 
-export const ai = genkit({
+// Configuración explícita para Genkit
+const genkitConfig: { plugins: PluginProvider[]; model?: string } = {
   plugins,
-  // Establecer un modelo por defecto condicionalmente solo si el plugin está activo.
-  // El campo 'model' en el nivel superior de la configuración de genkit() es un valor por defecto.
-  // Si el plugin googleAI no está cargado, este modelo no será válido.
-  ...(apiKey && { model: 'googleai/gemini-2.0-flash' }),
-  // Habilitar el logger de telemetría puede ser útil para depuración, pero opcional.
-  // enableTracing: true, // Descomentar si necesitas tracing detallado
-});
+};
 
-// Se eliminó el console.log que causaba el error.
-// console.log(`[Genkit Init] Genkit inicializado con ${plugins.length} plugin(s).`);
+// Solo establece un modelo por defecto si el plugin de Google AI está configurado (es decir, si hay una API key)
+if (apiKey) {
+  genkitConfig.model = 'googleai/gemini-2.0-flash'; // Modelo por defecto si se usa googleAI
+}
+
+export const ai = genkit(genkitConfig);

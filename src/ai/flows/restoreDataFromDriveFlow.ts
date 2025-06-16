@@ -51,9 +51,15 @@ const _restoreDataFromDriveFlow = ai.defineFlow(
       return { success: false, message: 'Critical: Access token missing within the flow execution.' };
     }
 
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token: input.accessToken });
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    let drive;
+    try {
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: input.accessToken });
+      drive = google.drive({ version: 'v3', auth: oauth2Client });
+    } catch (error: any) {
+      console.error('[Genkit Flow Restore] Error initializing Google Drive client:', error);
+      return { success: false, message: `Error initializing Google Drive client: ${error.message}` };
+    }
 
     const APP_FOLDER_NAME = 'LEDESC_App_Backups';
     const BACKUP_FILE_NAME = `ledesc_backup_${input.userEmail.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
@@ -104,23 +110,21 @@ const _restoreDataFromDriveFlow = ai.defineFlow(
       console.log(`[Genkit Flow Restore] Downloading file ID: ${backupFileId}`);
       const fileResponse = await drive.files.get(
         { fileId: backupFileId, alt: 'media' },
-        { responseType: 'json' } // Get response as parsed JSON directly if it's text/json
+        { responseType: 'json' } 
       );
       
-      // The Drive API for 'media' often returns the raw content.
-      // If responseType: 'json' doesn't parse it for application/json, we parse manually.
       let backupDataObject: any;
       if (typeof fileResponse.data === 'string') {
          backupDataObject = JSON.parse(fileResponse.data);
       } else if (typeof fileResponse.data === 'object' && fileResponse.data !== null) {
-         backupDataObject = fileResponse.data; // Already an object
+         backupDataObject = fileResponse.data;
       } else {
         throw new Error("Backup file content is not in expected format.");
       }
 
       const purchasesData = JSON.stringify(backupDataObject.purchases || []);
       const merchantsData = JSON.stringify(backupDataObject.merchants || []);
-      const settingsData = JSON.stringify(backupDataObject.settings || {}); // Settings might be an object
+      const settingsData = JSON.stringify(backupDataObject.settings || {});
 
       console.log(`[Genkit Flow Restore] File content downloaded and parsed successfully.`);
       return {
@@ -136,4 +140,3 @@ const _restoreDataFromDriveFlow = ai.defineFlow(
     }
   }
 );
-

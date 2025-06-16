@@ -52,14 +52,18 @@ const _backupDataToDriveFlow = ai.defineFlow(
         return { success: false, message: 'Critical: Access token missing within the flow execution.' };
     }
 
-    const oauth2Client = new google.auth.OAuth2();
-    oauth2Client.setCredentials({ access_token: input.accessToken });
-    const drive = google.drive({ version: 'v3', auth: oauth2Client });
+    let drive;
+    try {
+      const oauth2Client = new google.auth.OAuth2();
+      oauth2Client.setCredentials({ access_token: input.accessToken });
+      drive = google.drive({ version: 'v3', auth: oauth2Client });
+    } catch (error: any) {
+      console.error('[Genkit Flow] Error initializing Google Drive client:', error);
+      return { success: false, message: `Error initializing Google Drive client: ${error.message}` };
+    }
 
     const APP_FOLDER_NAME = 'LEDESC_App_Backups';
-    // User-specific file name to prevent conflicts if multiple app users use the same Google Account (e.g. developer testing)
-    // This is less likely now each user uses their own Google Account for backup.
-    const BACKUP_FILE_NAME = `ledesc_backup_${input.userEmail.replace(/[^a-zA-Z0-9]/g, '_')}.json`; 
+    const BACKUP_FILE_NAME = `ledesc_backup_${input.userEmail.replace(/[^a-zA-Z0-9]/g, '_')}.json`;
     const BACKUP_FILE_MIME_TYPE = 'application/json';
 
     let folderId = '';
@@ -68,7 +72,7 @@ const _backupDataToDriveFlow = ai.defineFlow(
       const folderSearchResponse = await drive.files.list({
         q: `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`,
         fields: 'files(id)',
-        spaces: 'drive', // Search within the user's Drive
+        spaces: 'drive',
       });
 
       if (folderSearchResponse.data.files && folderSearchResponse.data.files.length > 0) {
@@ -89,7 +93,6 @@ const _backupDataToDriveFlow = ai.defineFlow(
       }
     } catch (error: any) {
       console.error('[Genkit Flow] Error managing Drive folder:', error);
-      // Try to provide a more specific error if it's an auth issue
       if (error.message && error.message.includes("invalid_grant")) {
         return { success: false, message: `Error de autenticación con Google Drive. Es posible que necesites iniciar sesión de nuevo o que los permisos hayan cambiado. Detalles: ${error.message}` };
       }
@@ -146,7 +149,7 @@ const _backupDataToDriveFlow = ai.defineFlow(
         console.log(`[Genkit Flow] Creating new file: ${BACKUP_FILE_NAME}`);
         const fileMetadata = {
           name: BACKUP_FILE_NAME,
-          parents: [folderId], // Important to place it in the app's folder
+          parents: [folderId],
         };
         const createdFile = await drive.files.create({
           resource: fileMetadata,
