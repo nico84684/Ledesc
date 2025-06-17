@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { APP_NAME } from '@/config/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
-import { AuthButton } from '@/components/auth/AuthComponents'; // Import AuthButton
+import { AuthButton } from '@/components/auth/AuthComponents';
 
 export function Header() {
   return (
@@ -27,7 +27,7 @@ export function Header() {
         </span>
       </Link>
       <div className="ml-auto flex items-center gap-4">
-        <AuthButton /> {/* Add AuthButton here */}
+        <AuthButton />
       </div>
     </header>
   );

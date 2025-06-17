@@ -1,21 +1,20 @@
 
 import type { Metadata } from 'next';
-import { Inter as FontSans } from 'next/font/google'; // Using Inter as a clean sans-serif
-import '@/app/globals.css'; // Changed from './globals.css'
+import { Inter as FontSans } from 'next/font/google';
+import '@/app/globals.css'; // Usar alias para la importación
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
-import { Providers } from '@/components/layout/Providers'; // Importar el nuevo Providers
+import { Providers } from '@/components/layout/Providers';
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  variable: '--font-geist-sans', // Keep variable name for compatibility if geist was intended
+  variable: '--font-geist-sans',
 });
 
 export const metadata: Metadata = {
   title: APP_NAME,
   description: 'Gestiona tus beneficios gastronómicos de forma sencilla.',
-  // manifest: '/manifest.json', // Eliminado: next-pwa lo inyecta
 };
 
 export default function RootLayout({
@@ -37,15 +36,12 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
 
-        {/* Favicon general para navegadores */}
         <link rel="icon" href="/images/icono-alta512.png" type="image/png" />
 
-        {/* Iconos para Apple */}
         <link rel="apple-touch-icon" href="/images/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/images/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/images/icono-alta512.png" />
         
-        {/* next-pwa inyectará el <link rel="manifest"> aquí */}
       </head>
       <body
         className={cn(
@@ -53,7 +49,7 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <Providers> {/* Usar el componente Providers para envolver AppShell */}
+        <Providers>
           <AppShell>{children}</AppShell>
         </Providers>
       </body>

@@ -18,7 +18,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
   { href: '/add-purchase', label: 'Registrar Compra', icon: PlusCircle },
   { href: '/history', label: 'Historial', icon: History },
-  { href: '/merchants', label: 'Comercios', icon: Store }, // Nuevo ítem
+  { href: '/merchants', label: 'Comercios', icon: Store },
   { href: '/settings', label: 'Configuración', icon: SettingsIcon },
 ];
 

@@ -1,10 +1,9 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
-// Tipos PluginOptions y RuntimeCaching eliminados de la importación directa
 
 // Define the runtimeCaching configuration with explicit types for its content
-const runtimeCachingEntries = [ // Ya no se anota explícitamente como RuntimeCaching[] aquí
+const runtimeCachingEntries = [
   {
     urlPattern: /^https:\/\/placehold\.co\/.*/i,
     handler: 'CacheFirst' as const,
@@ -65,40 +64,40 @@ const runtimeCachingEntries = [ // Ya no se anota explícitamente como RuntimeCa
   },
 ];
 
-const pwaConfig = { // Ya no se anota explícitamente como PluginOptions aquí
+const pwaConfig = {
   dest: 'public',
-  disable: false, // Habilitar PWA incluso en desarrollo para pruebas en Firebase Studio
-  register: true, // Registra el service worker
-  skipWaiting: true, // Instala el nuevo SW inmediatamente
-  cacheOnFrontEndNav: true, // Cachea navegaciones del lado del cliente (App Router)
-  aggressiveFrontEndNavCaching: true, // Cacheo agresivo de navegaciones (App Router)
-  reloadOnOnline: true, // Recarga la página cuando se recupera la conexión
-  swcMinify: true, // Habilitar minificación con SWC
-  manifest: { // Configuración explícita del manifiesto
+  disable: false,
+  register: true,
+  skipWaiting: true,
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  swcMinify: true,
+  manifest: {
     name: 'LEDESC',
     short_name: 'LEDESC',
     description: 'Gestiona tus beneficios gastronómicos de forma sencilla.',
     start_url: '/',
     display: 'standalone',
-    background_color: '#F0F4F5', // Corresponde a --background en globals.css
-    theme_color: '#73A8B8',     // Corresponde a --primary en globals.css y meta theme-color
+    background_color: '#F0F4F5',
+    theme_color: '#73A8B8',
     icons: [
       {
         src: '/images/icono-alta512.png', // Ruta actualizada
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'any maskable', // 'maskable' es importante para Android
+        purpose: 'any maskable',
       },
       {
         src: '/images/icono-alta512.png', // Ruta actualizada
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any maskable', // 'maskable' es importante para Android
+        purpose: 'any maskable',
       },
     ],
   },
   workboxOptions: {
-    disableDevLogs: true, // Deshabilita logs de Workbox en producción
+    disableDevLogs: true,
     runtimeCaching: runtimeCachingEntries,
   },
 };
@@ -106,7 +105,6 @@ const pwaConfig = { // Ya no se anota explícitamente como PluginOptions aquí
 const withPWA = withPWAInit(pwaConfig);
 
 const nextConfig: NextConfig = {
-  /* config options here */
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -122,7 +120,7 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
-    unoptimized: true, // Generalmente recomendado para PWAs para evitar problemas con next/image y SW
+    unoptimized: true,
   },
 };
 

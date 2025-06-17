@@ -85,7 +85,7 @@ const _backupDataToDriveFlow = ai.defineFlow(
           mimeType: 'application/vnd.google-apps.folder',
         };
         const createdFolder = await drive.files.create({
-          requestBody: folderMetadata, // Changed 'resource' to 'requestBody'
+          requestBody: folderMetadata,
           fields: 'id',
         });
         folderId = createdFolder.data.id!;
@@ -152,7 +152,7 @@ const _backupDataToDriveFlow = ai.defineFlow(
           parents: [folderId],
         };
         const createdFile = await drive.files.create({
-          requestBody: fileMetadata, // Changed 'resource' to 'requestBody'
+          requestBody: fileMetadata,
           media: media,
           fields: 'id, name, webViewLink',
         });
