@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
 import { Inter as FontSans } from 'next/font/google';
-import '@/app/globals.css'; // Usar alias para la importación
+import './globals.css'; // Importación relativa que funcionó anteriormente
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
