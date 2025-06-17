@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
-import { Inter as FontSans } from 'next/font/google';
-import './globals.css'; // Ruta relativa, como en la versión que funcionó
+import { Inter as FontSans } from 'next/font/google'; // Using Inter as a clean sans-serif
+import './globals.css';
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
@@ -9,7 +9,7 @@ import { Providers } from '@/components/layout/Providers';
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  variable: '--font-geist-sans',
+  variable: '--font-geist-sans', // Keep variable name for compatibility if geist was intended
 });
 
 export const metadata: Metadata = {
