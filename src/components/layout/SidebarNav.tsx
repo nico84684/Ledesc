@@ -41,7 +41,6 @@ export function SidebarNav() {
               alt="LEDESC Icon" 
               width={32} 
               height={32} 
-              priority 
               data-ai-hint="logo abstract"
               className="h-8 w-8"
             />
