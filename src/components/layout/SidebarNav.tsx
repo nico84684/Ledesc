@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Home, History, Settings as SettingsIcon, PlusCircle, Store, HelpCircle } from 'lucide-react';
+import { Home, History, Settings as SettingsIcon, PlusCircle, Store, HelpCircle, MailQuestion } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   SidebarMenu,
@@ -20,6 +20,7 @@ const navItems = [
   { href: '/history', label: 'Historial', icon: History },
   { href: '/merchants', label: 'Comercios', icon: Store },
   { href: '/settings', label: 'Configuración', icon: SettingsIcon },
+  { href: '/contact', label: 'Contacto', icon: MailQuestion },
   { href: '/help', label: 'Ayuda', icon: HelpCircle },
 ];
 

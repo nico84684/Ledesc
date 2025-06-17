@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { APP_NAME } from '@/config/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck } from 'lucide-react';
+import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck, MailQuestion, MessageSquare, Send } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: `Centro de Ayuda - ${APP_NAME}`,
@@ -191,11 +191,32 @@ export default function HelpPage() {
                 </ul>
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-6">
+              <AccordionTrigger className="text-lg hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <MailQuestion className="h-5 w-5 text-primary" />
+                  Contacto
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-3 text-base pl-2">
+                <p><strong>¿Cómo puedo contactarlos?</strong></p>
+                <p>Utiliza la sección "Contacto" en el menú lateral para enviarnos tus mensajes. Queremos saber tu opinión para mejorar {APP_NAME}.</p>
+                
+                <p><strong>Formulario de Contacto:</strong></p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li><strong>Motivo del Contacto:</strong> Selecciona una de las opciones (<MessageSquare className="inline h-4 w-4" /> Sugerencias, <HelpCircle className="inline h-4 w-4" /> Reportar Errores, <HelpCircle className="inline h-4 w-4" /> Consultas Generales).</li>
+                  <li><strong>Tu Email de Contacto:</strong> Ingresa tu dirección de correo electrónico para que podamos responderte si es necesario.</li>
+                  <li><strong>Mensaje:</strong> Escribe aquí tu mensaje detallado.</li>
+                </ul>
+                 <p>Haz clic en "<Send className="inline h-4 w-4" /> Enviar Mensaje" una vez que hayas completado el formulario.</p>
+                 <p>Aunque no podemos garantizar una respuesta inmediata a todas las consultas, leeremos todos los mensajes y los tendremos en cuenta.</p>
+              </AccordionContent>
+            </AccordionItem>
+
           </Accordion>
         </CardContent>
       </Card>
     </div>
   );
 }
-
-    

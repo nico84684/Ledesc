@@ -1,9 +1,10 @@
+
 // This file contains server actions.
 // For this prototype, they will interact with the client-side store via context/hooks.
 // In a real application, these would interact with a database.
 "use server";
 
-import type { PurchaseFormData, SettingsFormData, AddMerchantFormData } from '@/lib/schemas';
+import type { PurchaseFormData, SettingsFormData, AddMerchantFormData, ContactFormData } from '@/lib/schemas';
 import type { Purchase, BenefitSettings, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { backupDataToDrive, type DriveBackupInput, type DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
@@ -163,4 +164,15 @@ export async function triggerGoogleDriveRestoreAction(
     console.error("Error al disparar el flujo de restauración desde Google Drive (acción del servidor):", error);
     return { success: false, message: error.message || "Falló al disparar la restauración desde Google Drive." };
   }
+}
+
+export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
+  console.log("Server Action: contactFormAction called with data:", data);
+  // En una aplicación real, aquí se enviaría un correo electrónico o se guardaría en una base de datos.
+  // Por ejemplo, usando un servicio como Resend, Nodemailer, o una API de backend.
+  
+  // Simular procesamiento
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
+  return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Nos pondremos en contacto contigo pronto si es necesario.` };
 }
