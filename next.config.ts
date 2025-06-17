@@ -39,7 +39,7 @@ const runtimeCachingEntries = [
     },
   },
   {
-    urlPattern: /\/icono-alta512\.png$/i, // Específico para icono-alta512.png en la raíz de public
+    urlPattern: /\/images\/icono-alta512\.png$/i, // Específico para icono-alta512.png en la carpeta public/images
     handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-main-icon-cache',
@@ -87,13 +87,13 @@ const pwaConfig = {
     theme_color: '#73A8B8',
     icons: [
       {
-        src: '/icono-alta512.png', // Ruta actualizada a la raíz de public
+        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable',
       },
       {
-        src: '/icono-alta512.png', // Ruta actualizada a la raíz de public
+        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',
