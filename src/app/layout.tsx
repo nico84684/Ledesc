@@ -1,15 +1,15 @@
 
 import type { Metadata } from 'next';
-import { Inter as FontSans } from 'next/font/google';
-import '@/app/globals.css'; // Usar alias para la importación
+import { Inter as FontSans } from 'next/font/google'; // Using Inter as a clean sans-serif
+import './globals.css';
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
-import { Providers } from '@/components/layout/Providers';
+import { Providers } from '@/components/layout/Providers'; // Importar el nuevo Providers
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  variable: '--font-geist-sans',
+  variable: '--font-geist-sans', // Keep variable name for compatibility if geist was intended
 });
 
 export const metadata: Metadata = {
@@ -36,11 +36,13 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
 
-        <link rel="icon" href="/images/icono-alta512.png" type="image/png" />
+        {/* Favicon general para navegadores */}
+        <link rel="icon" href="/icono-alta512.png" type="image/png" />
 
-        <link rel="apple-touch-icon" href="/images/icono-alta512.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/images/icono-alta512.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/images/icono-alta512.png" />
+        {/* Iconos para Apple */}
+        <link rel="apple-touch-icon" href="/icono-alta512.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/icono-alta512.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icono-alta512.png" />
         
       </head>
       <body
@@ -49,7 +51,7 @@ export default function RootLayout({
           fontSans.variable
         )}
       >
-        <Providers>
+        <Providers> {/* Usar el componente Providers para envolver AppShell */}
           <AppShell>{children}</AppShell>
         </Providers>
       </body>

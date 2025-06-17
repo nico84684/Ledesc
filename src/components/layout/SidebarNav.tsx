@@ -39,7 +39,7 @@ export function SidebarNav() {
       <div className="flex items-center justify-center px-4 py-4 border-b border-sidebar-border h-16">
          <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`} onClick={handleLinkClick}>
             <Image 
-              src="/images/icono-alta512.png" 
+              src="/icono-alta512.png" // Ruta actualizada a la raíz de public
               alt="LEDESC Icon" 
               width={32} 
               height={32} 
@@ -83,5 +83,3 @@ export function SidebarNav() {
     </nav>
   );
 }
-
-    
