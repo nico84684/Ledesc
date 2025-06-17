@@ -167,12 +167,34 @@ export async function triggerGoogleDriveRestoreAction(
 }
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
-  console.log("Server Action: contactFormAction called with data:", data);
-  // En una aplicación real, aquí se enviaría un correo electrónico o se guardaría en una base de datos.
-  // Por ejemplo, usando un servicio como Resend, Nodemailer, o una API de backend.
+  const developerEmail = "nicolas.s.fernandez@gmail.com";
+  console.log(`Server Action: contactFormAction called. Data received:`, data);
+  console.log(`Intention: Send email to ${developerEmail} with the following details:`);
+  console.log(`From: ${data.email}`);
+  console.log(`Reason: ${data.reason}`);
+  console.log(`Message: ${data.message}`);
   
-  // Simular procesamiento
+  // Simular procesamiento y (futuro) envío de correo
   await new Promise(resolve => setTimeout(resolve, 1000));
 
+  // Aquí iría la lógica real para enviar el correo electrónico.
+  // Por ejemplo, usando un servicio como Resend, Nodemailer, o una API de backend.
+  // try {
+  //   await sendEmail({
+  //     to: developerEmail,
+  //     from: 'noreply@yourdomain.com', // O una dirección de envío configurada
+  //     subject: `Nuevo mensaje de contacto: ${data.reason} - ${APP_NAME}`,
+  //     html: `<p>Has recibido un nuevo mensaje de contacto de: ${data.email}</p>
+  //            <p><strong>Motivo:</strong> ${data.reason}</p>
+  //            <p><strong>Mensaje:</strong></p>
+  //            <p>${data.message.replace(/\n/g, '<br>')}</p>`,
+  //   });
+  //   return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Ha sido enviado.` };
+  // } catch (error) {
+  //   console.error("Error sending contact email:", error);
+  //   return { success: false, message: "Hubo un problema al enviar tu mensaje. Por favor, intenta más tarde." };
+  // }
+
+  // Mensaje genérico de éxito para el usuario (simulado)
   return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Nos pondremos en contacto contigo pronto si es necesario.` };
 }
