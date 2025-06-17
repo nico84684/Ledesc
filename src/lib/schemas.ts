@@ -30,3 +30,13 @@ export const AddMerchantFormSchema = z.object({
 });
 
 export type AddMerchantFormData = z.infer<typeof AddMerchantFormSchema>;
+
+export const ContactFormSchema = z.object({
+  reason: z.enum(["sugerencias", "errores", "consultas"], {
+    required_error: "Debes seleccionar un motivo.",
+  }),
+  email: z.string().email("Por favor, ingresa un email válido.").min(1, "El email es requerido."),
+  message: z.string().min(10, "El mensaje debe tener al menos 10 caracteres.").max(1000, "El mensaje no puede exceder los 1000 caracteres."),
+});
+
+export type ContactFormData = z.infer<typeof ContactFormSchema>;

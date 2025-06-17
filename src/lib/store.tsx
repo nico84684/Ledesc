@@ -13,9 +13,12 @@ import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { triggerGoogleDriveBackupAction } from '@/lib/actions'; 
 import { useAuth } from '@/components/layout/Providers'; 
+import type { PurchaseFormData } from './schemas'; // Import PurchaseFormData
 
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
+  editPurchase: (purchaseId: string, purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => void;
+  deletePurchase: (purchaseId: string) => void;
   updateSettings: (newSettings: Partial<BenefitSettings>) => void;
   addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
@@ -284,12 +287,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         discountApplied: parseFloat(discountAmount.toFixed(2)),
         finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
       };
-      const updatedPurchases = [newPurchase, ...prevState.purchases];
+      const updatedPurchases = [newPurchase, ...prevState.purchases].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+
 
       const {
         updatedMerchants: merchantsAfterPurchase,
         newMerchant: addedMerchantFromPurchase,
-        updatedExistingMerchant // Asegurar que esta variable se desestructura correctamente
+        updatedExistingMerchant
       } = addMerchantInternal(newPurchase.merchantName, purchaseData.merchantLocation, prevState);
       
       setTimeout(() => {
@@ -320,6 +324,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return { ...prevState, purchases: updatedPurchases, merchants: merchantsAfterPurchase };
     });
   }, [toast, addMerchantInternal]);
+
+  const editPurchase = useCallback((purchaseId: string, purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => {
+    setState(prevState => {
+      const purchaseIndex = prevState.purchases.findIndex(p => p.id === purchaseId);
+      if (purchaseIndex === -1) {
+        setTimeout(() => toast({ title: "Error", description: "No se encontró la compra para editar.", variant: "destructive" }), 0);
+        return prevState;
+      }
+
+      const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
+      const updatedPurchase: Purchase = {
+        ...prevState.purchases[purchaseIndex],
+        ...purchaseData,
+        discountApplied: parseFloat(discountAmount.toFixed(2)),
+        finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
+      };
+
+      const updatedPurchases = [...prevState.purchases];
+      updatedPurchases[purchaseIndex] = updatedPurchase;
+      updatedPurchases.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+
+      const {
+        updatedMerchants: merchantsAfterEdit,
+        newMerchant: addedMerchantFromEdit,
+        updatedExistingMerchant
+      } = addMerchantInternal(updatedPurchase.merchantName, updatedPurchase.merchantLocation, prevState);
+
+      setTimeout(() => {
+        if (addedMerchantFromEdit) {
+            toast({ title: "Nuevo Comercio Registrado", description: `El comercio "${addedMerchantFromEdit.name}" ${addedMerchantFromEdit.location ? `en "${addedMerchantFromEdit.location}"` : ''} ha sido añadido por la edición.`});
+        } else if (updatedExistingMerchant) {
+             toast({ title: "Comercio Actualizado", description: `Se actualizó la ubicación de "${updatedExistingMerchant.name}" a "${updatedExistingMerchant.location}" por la edición.`});
+        }
+      },0);
+      
+      return { ...prevState, purchases: updatedPurchases, merchants: merchantsAfterEdit };
+    });
+  }, [toast, addMerchantInternal]);
+
+  const deletePurchase = useCallback((purchaseId: string) => {
+    setState(prevState => {
+      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
+      // No es necesario actualizar comercios aquí, ya que eliminar una compra no elimina el comercio.
+      return { ...prevState, purchases: updatedPurchases };
+    });
+  }, []);
+
 
   const updateSettings = useCallback((newSettingsData: Partial<BenefitSettings>) => {
     setState(prevState => ({ 
@@ -497,8 +548,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         setState(prevState => ({
           ...prevState,
-          purchases: restoredPurchases,
-          merchants: restoredMerchants,
+          purchases: restoredPurchases.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()),
+          merchants: restoredMerchants.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || '')),
         }));
 
         setTimeout(() => {
@@ -523,10 +574,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const restoreFromDrive = useCallback((purchasesDataStr?: string, merchantsDataStr?: string, settingsDataStr?: string) => {
     try {
-      const restoredPurchases: Purchase[] = purchasesDataStr ? JSON.parse(purchasesDataStr) : [];
-      const restoredMerchants: Merchant[] = merchantsDataStr ? JSON.parse(merchantsDataStr) : [];
+      const restoredPurchasesRaw: Purchase[] = purchasesDataStr ? JSON.parse(purchasesDataStr) : [];
+      const restoredMerchantsRaw: Merchant[] = merchantsDataStr ? JSON.parse(merchantsDataStr) : [];
       const restoredSettingsPartial: Partial<BenefitSettings> = settingsDataStr ? JSON.parse(settingsDataStr) : {};
       
+      // Asegurar ordenamiento después de restaurar
+      const restoredPurchases = restoredPurchasesRaw.sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+      const restoredMerchants = restoredMerchantsRaw.sort((a,b) => a.name.localeCompare(b.name) || (a.location || '').localeCompare(b.location || ''));
+
+
       setState(prevState => ({
         ...prevState,
         purchases: restoredPurchases,
@@ -536,11 +592,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           ...prevState.settings,     
           ...restoredSettingsPartial, 
           autoBackupToDrive: restoredSettingsPartial.autoBackupToDrive === undefined ? prevState.settings.autoBackupToDrive : restoredSettingsPartial.autoBackupToDrive,
-          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, // Mantener el timestamp local actual
+          lastBackupTimestamp: prevState.settings.lastBackupTimestamp, 
           enableEndOfMonthReminder: restoredSettingsPartial.enableEndOfMonthReminder === undefined ? prevState.settings.enableEndOfMonthReminder : restoredSettingsPartial.enableEndOfMonthReminder,
           daysBeforeEndOfMonthToRemind: restoredSettingsPartial.daysBeforeEndOfMonthToRemind === undefined ? prevState.settings.daysBeforeEndOfMonthToRemind : restoredSettingsPartial.daysBeforeEndOfMonthToRemind,
         },
-        // No resetear lastEndOfMonthReminderShownForMonth aquí, dejar que la lógica de recordatorio lo maneje
       }));
       
       setTimeout(() => {
@@ -558,7 +613,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={{ addPurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel, restoreFromDrive, updateLastBackupTimestamp }}>
+      <AppDispatchContext.Provider value={{ addPurchase, editPurchase, deletePurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel, restoreFromDrive, updateLastBackupTimestamp }}>
         {children}
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>

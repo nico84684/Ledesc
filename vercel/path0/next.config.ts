@@ -66,17 +66,13 @@ const runtimeCachingEntries = [
 
 const pwaConfig = {
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // Deshabilitar PWA en desarrollo
+  disable: false,
   register: true,
   skipWaiting: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
-  workboxOptions: {
-    disableDevLogs: true,
-    runtimeCaching: runtimeCachingEntries,
-  },
   manifest: {
     name: 'LEDESC',
     short_name: 'LEDESC',
@@ -99,6 +95,10 @@ const pwaConfig = {
         purpose: 'any maskable',
       },
     ],
+  },
+  workboxOptions: {
+    disableDevLogs: true,
+    runtimeCaching: runtimeCachingEntries,
   },
 };
 

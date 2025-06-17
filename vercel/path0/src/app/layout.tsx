@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
-import { Inter as FontSans } from 'next/font/google'; // Using Inter as a clean sans-serif
-import './globals.css';
+import { Inter as FontSans } from 'next/font/google';
+import './globals.css'; // Restaurado a la importación relativa
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
@@ -9,7 +9,7 @@ import { Providers } from '@/components/layout/Providers';
 
 const fontSans = FontSans({
   subsets: ['latin'],
-  variable: '--font-geist-sans', // Keep variable name for compatibility if geist was intended
+  variable: '--font-geist-sans',
 });
 
 export const metadata: Metadata = {
@@ -36,10 +36,8 @@ export default function RootLayout({
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
 
-        {/* Favicon general para navegadores, apuntando a public/icono-alta512.png */}
         <link rel="icon" href="/icono-alta512.png" type="image/png" />
 
-        {/* Iconos para Apple, apuntando a public/icono-alta512.png */}
         <link rel="apple-touch-icon" href="/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/icono-alta512.png" />
