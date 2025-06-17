@@ -38,12 +38,12 @@ export default function RootLayout({
         <meta name="theme-color" content="#73A8B8" />
 
         {/* Favicon general para navegadores */}
-        <link rel="icon" href="/icono-alta512.png" type="image/png" />
+        <link rel="icon" href="/images/icono-alta512.png" type="image/png" />
 
         {/* Iconos para Apple */}
-        <link rel="apple-touch-icon" href="/icono-alta512.png" />
-        <link rel="apple-touch-icon" sizes="192x192" href="/icono-alta512.png" />
-        <link rel="apple-touch-icon" sizes="512x512" href="/icono-alta512.png" />
+        <link rel="apple-touch-icon" href="/images/icono-alta512.png" />
+        <link rel="apple-touch-icon" sizes="192x192" href="/images/icono-alta512.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/images/icono-alta512.png" />
         
         {/* next-pwa inyectará el <link rel="manifest"> aquí */}
       </head>

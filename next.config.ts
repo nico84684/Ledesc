@@ -40,7 +40,7 @@ const runtimeCachingEntries = [ // Ya no se anota explícitamente como RuntimeCa
     },
   },
   {
-    urlPattern: /\/icono-alta512\.png$/i, // Específico para icono-alta512.png
+    urlPattern: /\/images\/icono-alta512\.png$/i, // Específico para icono-alta512.png en /images
     handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-main-icon-cache',
@@ -84,16 +84,16 @@ const pwaConfig = { // Ya no se anota explícitamente como PluginOptions aquí
     theme_color: '#73A8B8',     // Corresponde a --primary en globals.css y meta theme-color
     icons: [
       {
-        src: '/icono-alta512.png',
+        src: '/images/icono-alta512.png', // Ruta actualizada
         sizes: '192x192',
         type: 'image/png',
-        purpose: 'any maskable',
+        purpose: 'any maskable', // 'maskable' es importante para Android
       },
       {
-        src: '/icono-alta512.png',
+        src: '/images/icono-alta512.png', // Ruta actualizada
         sizes: '512x512',
         type: 'image/png',
-        purpose: 'any maskable',
+        purpose: 'any maskable', // 'maskable' es importante para Android
       },
     ],
   },
