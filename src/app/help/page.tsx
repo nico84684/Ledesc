@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { APP_NAME } from '@/config/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck, MailQuestion, MessageSquare, Send } from 'lucide-react';
+import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck, MailQuestion, MessageSquare, Send, Smartphone, Share, MoreVertical, PlusSquare } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: `Centro de Ayuda - ${APP_NAME}`,
@@ -192,6 +192,41 @@ export default function HelpPage() {
               </AccordionContent>
             </AccordionItem>
 
+            <AccordionItem value="item-install">
+              <AccordionTrigger className="text-lg hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Smartphone className="h-5 w-5 text-primary" />
+                  Instalar Aplicación en tu Móvil
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 text-base pl-2">
+                <p>{APP_NAME} es una Aplicación Web Progresiva (PWA), lo que significa que puedes instalarla en tu dispositivo móvil para un acceso más rápido y una experiencia similar a una aplicación nativa.</p>
+                
+                <div>
+                  <p><strong>En Android (usando Chrome):</strong></p>
+                  <ol className="list-decimal list-inside pl-4 space-y-1 mt-1">
+                    <li>Abre {APP_NAME} en tu navegador Chrome.</li>
+                    <li>Toca el menú de Chrome (usualmente tres puntos verticales <MoreVertical className="inline h-4 w-4" /> en la esquina superior derecha).</li>
+                    <li>Busca y selecciona la opción "Instalar aplicación" o "Agregar a la pantalla principal" <PlusSquare className="inline h-4 w-4" />.</li>
+                    <li>Sigue las instrucciones en pantalla para confirmar.</li>
+                    <li>El ícono de {APP_NAME} aparecerá en tu pantalla de inicio o en tu cajón de aplicaciones.</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <p><strong>En iOS (iPhone/iPad, usando Safari):</strong></p>
+                  <ol className="list-decimal list-inside pl-4 space-y-1 mt-1">
+                    <li>Abre {APP_NAME} en tu navegador Safari.</li>
+                    <li>Toca el ícono de Compartir (un cuadrado con una flecha hacia arriba <Share className="inline h-4 w-4" /> en la barra de navegación inferior o superior).</li>
+                    <li>Desplázate hacia abajo en el menú de compartir y busca la opción "Agregar a inicio" <PlusSquare className="inline h-4 w-4" />.</li>
+                    <li>Confirma el nombre de la aplicación (debería ser {APP_NAME}) y toca "Agregar".</li>
+                    <li>El ícono de {APP_NAME} aparecerá en tu pantalla de inicio.</li>
+                  </ol>
+                </div>
+                <p>Una vez instalada, podrás iniciar {APP_NAME} directamente desde su ícono como cualquier otra aplicación.</p>
+              </AccordionContent>
+            </AccordionItem>
+
             <AccordionItem value="item-6">
               <AccordionTrigger className="text-lg hover:no-underline">
                 <div className="flex items-center gap-2">
@@ -220,3 +255,4 @@ export default function HelpPage() {
     </div>
   );
 }
+
