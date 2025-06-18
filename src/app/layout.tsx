@@ -1,4 +1,3 @@
-
 import type { Metadata } from 'next';
 import { Inter as FontSans } from 'next/font/google';
 import '@/app/globals.css'; // Usar alias para la importación
@@ -35,9 +34,7 @@ export default function RootLayout({
         <meta name="msapplication-TileColor" content="#73A8B8" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
-
         <link rel="icon" href="/images/icono-alta512.png" type="image/png" />
-        
         <link rel="apple-touch-icon" href="/images/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="192x192" href="/images/icono-alta512.png" />
         <link rel="apple-touch-icon" sizes="512x512" href="/images/icono-alta512.png" />
