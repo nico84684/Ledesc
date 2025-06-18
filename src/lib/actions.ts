@@ -9,7 +9,8 @@ import type { Purchase, BenefitSettings, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { backupDataToDrive, type DriveBackupInput, type DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
 import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
-import { APP_NAME } from '@/config/constants'; // Importar APP_NAME si se usa en el subject del email
+import { APP_NAME } from '@/config/constants';
+import { Resend } from 'resend';
 
 export async function addPurchaseAction(data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
   console.log("Server Action: addPurchaseAction called with data:", data);
@@ -169,48 +170,44 @@ export async function triggerGoogleDriveRestoreAction(
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
   const targetEmail = "nicolas.s.fernandez@gmail.com";
-  
-  console.log("Server Action: contactFormAction invocado.");
-  console.log("Datos recibidos del formulario:", data);
-  console.log(`SIMULACIÓN: Preparando para enviar correo a: ${targetEmail}`);
-  console.log(`De: ${data.email}`);
-  console.log(`Motivo: ${data.reason}`);
-  console.log(`Mensaje: ${data.message}`);
-  
-  // Simulación de procesamiento y envío de correo
-  await new Promise(resolve => setTimeout(resolve, 1000)); // Simula un retraso de red
+  const resendApiKey = process.env.RESEND_API_KEY;
 
-  // --- INICIO DE SECCIÓN PARA LÓGICA DE ENVÍO DE CORREO REAL ---
-  // En una aplicación real, aquí integrarías un servicio de envío de correo como:
-  // - Resend (con react-email)
-  // - Nodemailer (si tienes un backend de Node.js separado o una función serverless)
-  // - SendGrid, Mailgun, AWS SES, etc.
-  //
-  // Ejemplo conceptual (NO FUNCIONAL SIN IMPLEMENTACIÓN REAL):
-  // try {
-  //   await sendEmailService.send({
-  //     to: targetEmail,
-  //     from: "noreply@ledescapp.com", // O un email de tu dominio verificado
-  //     subject: `Nuevo mensaje de ${APP_NAME} Contacto: ${data.reason}`,
-  //     html: `
-  //       <h1>Nuevo Mensaje de Contacto</h1>
-  //       <p><strong>De:</strong> ${data.email}</p>
-  //       <p><strong>Motivo:</strong> ${data.reason}</p>
-  //       <hr />
-  //       <p><strong>Mensaje:</strong></p>
-  //       <p>${data.message.replace(/\n/g, "<br>")}</p>
-  //     `,
-  //   });
-  //   console.log(`SIMULACIÓN: Correo a ${targetEmail} enviado exitosamente (simulado).`);
-  //   return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Ha sido enviado.` };
-  // } catch (error) {
-  //   console.error("Error en la simulación de envío de correo:", error);
-  //   return { success: false, message: "Hubo un problema al intentar enviar tu mensaje. Por favor, intenta más tarde." };
-  // }
-  // --- FIN DE SECCIÓN PARA LÓGICA DE ENVÍO DE CORREO REAL ---
+  if (!resendApiKey) {
+    console.error("Error: RESEND_API_KEY no está configurada en las variables de entorno.");
+    // En producción, es crucial no exponer detalles del error al cliente.
+    // Podrías retornar un mensaje genérico o loggear el error internamente.
+    return { success: false, message: "El servicio de envío de correo no está configurado correctamente. Por favor, contacta al administrador." };
+  }
 
-  // Mensaje de éxito genérico para la simulación actual
-  console.log(`SIMULACIÓN: Operación completada. Se retornará un mensaje de éxito al cliente.`);
-  return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Nos pondremos en contacto contigo pronto si es necesario.` };
+  const resend = new Resend(resendApiKey);
+
+  try {
+    const emailData = await resend.emails.send({
+      from: `Contacto ${APP_NAME} <onboarding@resend.dev>`, // Puedes cambiar 'onboarding@resend.dev' si verificas un dominio en Resend
+      to: [targetEmail],
+      subject: `Nuevo mensaje de Contacto (${APP_NAME}): ${data.reason}`,
+      reply_to: data.email,
+      html: `
+        <h1>Nuevo Mensaje de Contacto desde ${APP_NAME}</h1>
+        <p><strong>De:</strong> ${data.email}</p>
+        <p><strong>Motivo:</strong> ${data.reason}</p>
+        <hr />
+        <p><strong>Mensaje:</strong></p>
+        <p>${data.message.replace(/\n/g, "<br>")}</p>
+      `,
+    });
+
+    if (emailData.error) {
+      console.error("Error al enviar correo con Resend:", emailData.error);
+      return { success: false, message: `Hubo un problema al enviar tu mensaje: ${emailData.error.message}` };
+    }
+
+    console.log(`Correo enviado exitosamente a ${targetEmail} a través de Resend. ID: ${emailData.data?.id}`);
+    return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Ha sido enviado.` };
+
+  } catch (error: any) {
+    console.error("Excepción al intentar enviar correo con Resend:", error);
+    // Aquí también, cuidado con exponer detalles del error al cliente.
+    return { success: false, message: "Hubo un problema inesperado al intentar enviar tu mensaje. Por favor, intenta más tarde." };
+  }
 }
-
