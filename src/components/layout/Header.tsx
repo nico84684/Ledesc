@@ -22,13 +22,13 @@ export function Header() {
         />
         <span
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }}
-          className="text-xl px-3 py-1 rounded-lg bg-gradient-to-r from-white/50 via-white/20 to-white/0 dark:from-slate-100/60 dark:via-slate-100/30 dark:to-slate-100/0 dark:ring-1 dark:ring-transparent"
+          className="text-xl px-3 py-1 rounded-lg bg-gradient-to-r from-white/50 via-white/20 to-white/0 dark:from-slate-100/60 dark:via-slate-100/30 dark:to-slate-100/0"
         >
           {APP_NAME}
         </span>
       </Link>
       <div className="ml-auto flex items-center gap-2">
-        <ThemeToggleButton /> 
+        <ThemeToggleButton />
         <AuthButton />
       </div>
     </header>
