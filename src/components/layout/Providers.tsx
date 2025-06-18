@@ -6,7 +6,8 @@ import { createContext, useContext, useEffect, useState, useCallback }
 from 'react';
 import { onAuthStateChanged, type User, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { useToast } from '@/hooks/use-toast';
+import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 interface AuthContextType {
   user: User | null;
@@ -22,13 +23,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (!currentUser) {
-        setAccessToken(null); // Clear access token if user signs out or session expires
+        setAccessToken(null); 
       }
       setLoading(false);
     });
@@ -37,14 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async () => {
     const provider = new GoogleAuthProvider();
-    provider.addScope('https://www.googleapis.com/auth/drive.file'); // Request Drive scope
+    provider.addScope('https://www.googleapis.com/auth/drive.file');
     try {
       const result = await signInWithPopup(auth, provider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       if (credential?.accessToken) {
         setAccessToken(credential.accessToken);
       }
-      setUser(result.user); // Explicitly set user from result as onAuthStateChanged might be slightly delayed
+      setUser(result.user);
       toast({ title: "Inicio de Sesión Exitoso", description: "Has iniciado sesión con Google." });
     } catch (error: any) {
       console.error("Error during Google sign-in:", error);
@@ -56,8 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     try {
       await firebaseSignOut(auth);
-      setAccessToken(null); // Clear access token on sign out
-      // onAuthStateChanged will set user to null
+      setAccessToken(null); 
       toast({ title: "Cierre de Sesión Exitoso", description: "Has cerrado tu sesión." });
     } catch (error: any) {
       console.error("Error during sign-out:", error);
@@ -80,11 +80,19 @@ export function useAuth() {
   return context;
 }
 
-// Main Providers component that now includes AuthProvider
-export function Providers({ children }: ProvidersProps) {
-  return <AuthProvider>{children}</AuthProvider>;
-}
-
 interface ProvidersProps {
   children: ReactNode;
+}
+
+export function Providers({ children }: ProvidersProps) {
+  return (
+    <NextThemesProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <AuthProvider>{children}</AuthProvider>
+    </NextThemesProvider>
+  );
 }

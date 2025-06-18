@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { APP_NAME } from '@/config/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { AuthButton } from '@/components/auth/AuthComponents';
+import { ThemeToggleButton } from './ThemeToggleButton'; // Importar el nuevo componente
 
 export function Header() {
   return (
@@ -13,7 +14,7 @@ export function Header() {
       </div>
       <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`}>
         <Image
-          src="/images/icono-alta512.png" // Ruta actualizada a public/images
+          src="/images/icono-alta512.png"
           alt="LEDESC Icon"
           width={32}
           height={32}
@@ -21,12 +22,13 @@ export function Header() {
         />
         <span
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }}
-          className="text-xl"
+          className="text-xl dark:text-slate-200" // Ajuste para mejor visibilidad en modo oscuro
         >
           {APP_NAME}
         </span>
       </Link>
-      <div className="ml-auto flex items-center gap-4">
+      <div className="ml-auto flex items-center gap-2">
+        <ThemeToggleButton /> 
         <AuthButton />
       </div>
     </header>
