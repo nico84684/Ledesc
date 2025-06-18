@@ -37,6 +37,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog'; // Import EditPurchaseDialog
 import { deletePurchaseAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
@@ -128,6 +129,9 @@ export function TransactionHistoryTable() {
     );
   }
 
+  const cellPadding = "px-2 py-3";
+  const headPadding = "px-2 py-3 h-10";
+
   return (
     <TooltipProvider>
     <div className="space-y-6">
@@ -204,24 +208,27 @@ export function TransactionHistoryTable() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[120px] min-w-[120px]"><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
-                <TableHead><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
-                <TableHead><MessageSquareText className="inline mr-1 h-4 w-4" />Descripción</TableHead>
-                <TableHead className="text-right">Monto Original</TableHead>
-                <TableHead className="text-right">Descuento</TableHead>
-                <TableHead className="text-right">Monto Final</TableHead>
-                <TableHead className="text-center">Recibo</TableHead>
-                <TableHead className="text-center">Acciones</TableHead>
+                <TableHead className={cn("w-[100px] min-w-[90px]", headPadding)}><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
+                <TableHead className={headPadding}><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
+                <TableHead className={headPadding}><MessageSquareText className="inline mr-1 h-4 w-4" />Descripción</TableHead>
+                <TableHead className={cn("text-right", headPadding)}>Monto Original</TableHead>
+                <TableHead className={cn("text-right", headPadding)}>Descuento</TableHead>
+                <TableHead className={cn("text-right", headPadding)}>Monto Final</TableHead>
+                <TableHead className={cn("text-center", headPadding)}>Recibo</TableHead>
+                <TableHead className={cn("text-center", headPadding)}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedPurchases.map((purchase) => (
                 <TableRow key={purchase.id}>
-                  <TableCell>{format(parseISO(purchase.date), 'dd MMM yyyy', { locale: es })}</TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className={cellPadding}>
+                    <span className="hidden sm:inline">{format(parseISO(purchase.date), 'dd MMM yy', { locale: es })}</span>
+                    <span className="sm:hidden">{format(parseISO(purchase.date), 'dd/MM/yy', { locale: es })}</span>
+                  </TableCell>
+                  <TableCell className={cn("font-medium", cellPadding)}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="truncate block max-w-[120px] sm:max-w-[180px] cursor-default">
+                        <span className="truncate block max-w-[100px] sm:max-w-[150px] cursor-default">
                           {purchase.merchantName}
                         </span>
                       </TooltipTrigger>
@@ -230,11 +237,11 @@ export function TransactionHistoryTable() {
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className={cellPadding}>
                     {purchase.description ? (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <span className="truncate block max-w-[150px] cursor-default">
+                          <span className="truncate block max-w-[120px] cursor-default">
                             {purchase.description}
                           </span>
                         </TooltipTrigger>
@@ -246,10 +253,10 @@ export function TransactionHistoryTable() {
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right">{formatCurrency(purchase.amount)}</TableCell>
-                  <TableCell className="text-right text-green-600 dark:text-green-400">-{formatCurrency(purchase.discountApplied)}</TableCell>
-                  <TableCell className="text-right font-semibold">{formatCurrency(purchase.finalAmount)}</TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className={cn("text-right", cellPadding)}>{formatCurrency(purchase.amount)}</TableCell>
+                  <TableCell className={cn("text-right text-green-600 dark:text-green-400", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
+                  <TableCell className={cn("text-right font-semibold", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
+                  <TableCell className={cn("text-center", cellPadding)}>
                     {purchase.receiptImageUrl ? (
                        <Dialog>
                         <DialogTrigger asChild>
@@ -271,7 +278,7 @@ export function TransactionHistoryTable() {
                       <span className="text-xs text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className={cn("text-center", cellPadding)}>
                     <div className="flex items-center justify-center space-x-1">
                       <Tooltip>
                         <TooltipTrigger asChild>
