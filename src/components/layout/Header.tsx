@@ -22,7 +22,7 @@ export function Header() {
         />
         <span
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }}
-          className="text-xl dark:px-2 dark:py-0.5 dark:bg-gradient-to-r dark:from-slate-200/70 dark:via-slate-200/40 dark:to-transparent dark:rounded-md"
+          className="text-xl dark:text-slate-200" // Revertido a esta clase
         >
           {APP_NAME}
         </span>
