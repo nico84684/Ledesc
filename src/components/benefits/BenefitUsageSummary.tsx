@@ -118,8 +118,8 @@ export function BenefitUsageSummary() {
           <Progress value={clientData.percentageUsed} aria-label={`${clientData.percentageUsed.toFixed(1)}% del beneficio utilizado`} className="h-3" />
         </div>
 
-        <div className="flex items-center justify-center p-3 border rounded-lg bg-card shadow-sm">
-          <CalendarClock className="h-6 w-6 text-primary mr-3" />
+        <div className="flex flex-col sm:flex-row items-center text-center sm:text-left justify-center p-3 border rounded-lg bg-card shadow-sm">
+          <CalendarClock className="h-6 w-6 text-primary mb-2 sm:mb-0 sm:mr-3" />
           <div>
             <p className="text-lg font-semibold text-foreground">
               {clientData.remainingDaysInMonth} día{clientData.remainingDaysInMonth !== 1 ? 's' : ''}
