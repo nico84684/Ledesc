@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { APP_NAME } from '@/config/constants';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { AuthButton } from '@/components/auth/AuthComponents';
-import { ThemeToggleButton } from './ThemeToggleButton'; // Importar el nuevo componente
+import { ThemeToggleButton } from './ThemeToggleButton';
 
 export function Header() {
   return (
@@ -22,7 +22,7 @@ export function Header() {
         />
         <span
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }}
-          className="text-xl dark:text-slate-200" // Revertido a esta clase
+          className="text-xl dark:px-2 dark:py-0.5 dark:bg-gradient-to-r dark:from-slate-200/70 dark:via-slate-200/50 dark:to-transparent dark:rounded-md"
         >
           {APP_NAME}
         </span>
