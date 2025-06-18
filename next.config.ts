@@ -1,6 +1,7 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
+import path from 'path'; // Import path
 
 // Define the runtimeCaching configuration with explicit types for its content
 const runtimeCachingEntries = [
@@ -51,7 +52,7 @@ const runtimeCachingEntries = [
     },
   },
   {
-    urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
+    urlPattern: /\/manifest\.(?:json|webmanifest)$/i, // Esta ruta asume que el manifest está en public/
     handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-manifest-cache',
@@ -121,6 +122,15 @@ const nextConfig: NextConfig = {
       },
     ],
     unoptimized: true,
+  },
+  webpack: (config, options) => {
+    // Add the @ alias explicitly
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+    };
+    // Important: return the modified config
+    return config;
   },
 };
 

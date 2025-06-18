@@ -1,7 +1,7 @@
 
 import type { Metadata } from 'next';
 import { Inter as FontSans } from 'next/font/google';
-import './globals.css'; // Importación relativa
+import '@/app/globals.css'; // Usar alias para la importación
 import { cn } from '@/lib/utils';
 import { AppShell } from '@/components/layout/AppShell';
 import { APP_NAME } from '@/config/constants';
@@ -31,7 +31,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content={APP_NAME} />
         <meta name="format-detection" content="telephone=no" />
         <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="msapplication-config" content="/icons/browserconfig.xml" />
+        <meta name="msapplication-config" content="/icons/browserconfig.xml" /> {/* Asumiendo que tendrás este archivo en public/icons/ */}
         <meta name="msapplication-TileColor" content="#73A8B8" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#73A8B8" />
