@@ -1,6 +1,7 @@
 
 import type { NextConfig } from 'next';
 import withPWAInit from '@ducanh2912/next-pwa';
+import path from 'path'; // Import path
 
 // Define the runtimeCaching configuration with explicit types for its content
 const runtimeCachingEntries = [
@@ -39,7 +40,7 @@ const runtimeCachingEntries = [
     },
   },
   {
-    urlPattern: /\/icono-alta512\.png$/i, // Específico para icono-alta512.png en la raíz de public
+    urlPattern: /\/images\/icono-alta512\.png$/i, // Específico para icono-alta512.png en la carpeta public/images
     handler: 'NetworkFirst' as const,
     options: {
       cacheName: 'app-main-icon-cache',
@@ -66,13 +67,17 @@ const runtimeCachingEntries = [
 
 const pwaConfig = {
   dest: 'public',
-  disable: false,
+  disable: process.env.NODE_ENV === 'development', // Deshabilitar PWA en desarrollo
   register: true,
   skipWaiting: true,
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
+  workboxOptions: {
+    disableDevLogs: true,
+    runtimeCaching: runtimeCachingEntries,
+  },
   manifest: {
     name: 'LEDESC',
     short_name: 'LEDESC',
@@ -83,28 +88,24 @@ const pwaConfig = {
     theme_color: '#73A8B8',
     icons: [
       {
-        src: '/icono-alta512.png', // Ruta actualizada a la raíz de public
+        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable',
       },
       {
-        src: '/icono-alta512.png', // Ruta actualizada a la raíz de public
+        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',
       },
     ],
   },
-  workboxOptions: {
-    disableDevLogs: true,
-    runtimeCaching: runtimeCachingEntries,
-  },
 };
 
 const withPWA = withPWAInit(pwaConfig);
 
-const nextConfig: NextConfig = {
+const baseNextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -122,6 +123,15 @@ const nextConfig: NextConfig = {
     ],
     unoptimized: true,
   },
+  webpack: (config, options) => {
+    // Add the @ alias explicitly
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': path.resolve(__dirname, 'src'),
+    };
+    // Important: return the modified config
+    return config;
+  },
 };
 
-export default withPWA(nextConfig);
+export default withPWA(baseNextConfig);
