@@ -204,7 +204,7 @@ export function TransactionHistoryTable() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[150px]"><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
+                <TableHead className="w-[120px] min-w-[120px]"><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
                 <TableHead><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
                 <TableHead><MessageSquareText className="inline mr-1 h-4 w-4" />Descripción</TableHead>
                 <TableHead className="text-right">Monto Original</TableHead>
@@ -218,7 +218,18 @@ export function TransactionHistoryTable() {
               {paginatedPurchases.map((purchase) => (
                 <TableRow key={purchase.id}>
                   <TableCell>{format(parseISO(purchase.date), 'dd MMM yyyy', { locale: es })}</TableCell>
-                  <TableCell className="font-medium">{purchase.merchantName}</TableCell>
+                  <TableCell className="font-medium">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="truncate block max-w-[120px] sm:max-w-[180px] cursor-default">
+                          {purchase.merchantName}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" align="start">
+                        <p className="max-w-xs whitespace-normal break-words">{purchase.merchantName}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>
                     {purchase.description ? (
                       <Tooltip>
@@ -346,3 +357,4 @@ export function TransactionHistoryTable() {
     </TooltipProvider>
   );
 }
+
