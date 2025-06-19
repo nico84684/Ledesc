@@ -103,14 +103,11 @@ export function TransactionHistoryTable() {
     setIsDeleting(true);
     try {
       const result = await deletePurchaseAction(purchaseId);
-      if (result.success && result.purchaseId === purchaseId) {
+      if (result.success) {
         deletePurchaseFromStore(purchaseId);
         toast({ title: "Éxito", description: result.message });
-      } else if (result.success && result.purchaseId !== purchaseId) {
-        toast({ title: "Error de Sincronización", description: "El ID de la compra procesada por el servidor no coincide con la solicitada.", variant: "destructive" });
-      }
-      else { // result.success is false
-        toast({ title: "Error", description: result.message || "No se pudo eliminar la compra desde el servidor.", variant: "destructive" });
+      } else {
+        toast({ title: "Error", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
       }
     } catch (error: any) {
       toast({ title: "Error Inesperado", description: "Ocurrió un error al intentar eliminar la compra.", variant: "destructive" });
