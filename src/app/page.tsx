@@ -1,3 +1,4 @@
+
 import { BenefitUsageSummary } from '@/components/benefits/BenefitUsageSummary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -41,10 +42,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
+        <Card className="shadow-md hover:shadow-lg transition-shadow hover:border-accent">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-              <History className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <History className="h-5 w-5 sm:h-6 sm:w-6 text-accent" />
               Historial
             </CardTitle>
             <CardDescription>Consulta todas tus transacciones pasadas.</CardDescription>
@@ -56,10 +57,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
+        <Card className="shadow-md hover:shadow-lg transition-shadow hover:border-emerald-500">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
-              <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
               Configuración
             </CardTitle>
             <CardDescription>Ajusta los parámetros de tu beneficio.</CardDescription>
