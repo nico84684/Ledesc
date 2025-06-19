@@ -12,8 +12,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { triggerGoogleDriveBackupAction } from '@/lib/actions';
 import { useAuth } from '@/components/layout/Providers';
-import { ensureFirebaseInitialized } from '@/lib/firebase'; // db ya no se importa directamente
-import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, onSnapshot, query, orderBy, where, type Firestore } from "firebase/firestore"; // Importar Firestore
+import { ensureFirebaseInitialized } from '@/lib/firebase';
+import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, onSnapshot, query, orderBy, where, type Firestore } from "firebase/firestore";
 import { updateSettingsAction as serverUpdateSettingsAction, addPurchaseAction as serverAddPurchaseAction, editPurchaseAction as serverEditPurchaseAction, deletePurchaseAction as serverDeletePurchaseAction, addManualMerchantAction as serverAddManualMerchantAction } from '@/lib/actions';
 
 
@@ -28,7 +28,7 @@ interface AppDispatchContextType {
   backupToExcel: () => void;
   restoreFromExcel: (file: File) => void;
   restoreFromDrive: (purchasesDataStr?: string, merchantsDataStr?: string, settingsDataStr?: string) => void;
-  updateLastBackupTimestamp: () => void; // For Drive/Excel backup specifically
+  updateLastBackupTimestamp: () => void;
 }
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
@@ -44,7 +44,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { toast } = useToast();
   const { user, accessToken, isFirebaseAuthReady } = useAuth();
-  // db se obtendrá de ensureFirebaseInitialized dentro de useEffect
 
   const [state, setState] = useState<AppState>({
     purchases: [],
@@ -62,12 +61,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const loadData = async () => {
-      console.log("[AppStore] useEffect loadData. User:", user?.uid, "isFirebaseAuthReady:", isFirebaseAuthReady, "pathname:", pathname);
+      // console.log("[AppStore] useEffect loadData. User:", user?.uid, "isFirebaseAuthReady:", isFirebaseAuthReady, "pathname:", pathname);
       if (isFirebaseAuthReady) {
-        const { db: firestoreDb } = ensureFirebaseInitialized(); // Obtener db aquí
+        const { db: firestoreDb } = ensureFirebaseInitialized();
 
         if (user && user.uid && firestoreDb) {
-          console.log(`[AppStore] User ${user.uid} authenticated. Initializing Firestore listeners.`);
+          // console.log(`[AppStore] User ${user.uid} authenticated. Initializing Firestore listeners.`);
           setIsFirestoreLoading(true);
           firestoreUnsubscribersRef.current.forEach(unsub => unsub());
           firestoreUnsubscribersRef.current = [];
@@ -80,11 +79,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           const settingsUnsub = onSnapshot(settingsDocRef, (docSnap) => {
             const newSettings = docSnap.exists()
-              ? { ...DEFAULT_BENEFIT_SETTINGS, ...(docSnap.data() as BenefitSettings), lastLocalSaveTimestamp: state.settings.lastLocalSaveTimestamp } // Mantener lastLocalSaveTimestamp
+              ? { ...DEFAULT_BENEFIT_SETTINGS, ...(docSnap.data() as BenefitSettings), lastLocalSaveTimestamp: state.settings.lastLocalSaveTimestamp }
               : { ...DEFAULT_BENEFIT_SETTINGS, lastEndOfMonthReminderShownForMonth: undefined, lastLocalSaveTimestamp: state.settings.lastLocalSaveTimestamp };
             setState(prevState => ({ ...prevState, settings: newSettings }));
             if (docSnap.exists() && typeof window !== 'undefined') localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
             else if (!docSnap.exists() && typeof window !== 'undefined' && localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true' && pathname !== '/settings') {
+                // console.log("[AppStore] No Firestore settings, setup not complete, redirecting to /settings");
                 router.push('/settings');
             }
           }, (error) => console.error("[AppStore] Error listening to settings:", error));
@@ -109,8 +109,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           } catch (error) { console.error("[AppStore] Error during initial Firestore batch load:", error);
           } finally { setIsFirestoreLoading(false); setIsInitialized(true); }
 
-        } else { // No user authenticated or firestoreDb not available
-          console.log("[AppStore] No authenticated user or Firestore DB not ready. Loading from localStorage.");
+        } else {
+          // console.log("[AppStore] No authenticated user or Firestore DB not ready. Loading from localStorage.");
           setIsFirestoreLoading(false);
           if (typeof window !== 'undefined') {
             const localSettingsStr = localStorage.getItem(LOCAL_STORAGE_SETTINGS_KEY);
@@ -125,7 +125,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
               purchases: localPurchasesStr ? JSON.parse(localPurchasesStr) : [],
               merchants: localMerchantsStr ? JSON.parse(localMerchantsStr) : [],
             });
-            if (!setupComplete && pathname !== '/settings') router.push('/settings');
+            if (!setupComplete && pathname !== '/settings') {
+              // console.log("[AppStore] localStorage setup not complete, redirecting to /settings");
+              router.push('/settings');
+            }
           }
           setIsInitialized(true);
         }
@@ -136,21 +139,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
       firestoreUnsubscribersRef.current.forEach(unsub => unsub());
       firestoreUnsubscribersRef.current = [];
     };
-  // No incluir 'db' directamente aquí, se obtiene dentro del efecto.
-  // 'state.settings.lastLocalSaveTimestamp' se incluye para que el efecto de settingsUnsub no lo sobreescriba innecesariamente
-  }, [user, isFirebaseAuthReady, router, pathname, state.settings.lastLocalSaveTimestamp]);
+  }, [user, isFirebaseAuthReady, router, pathname]); // Removed state.settings.lastLocalSaveTimestamp to avoid potential issues
 
 
   useEffect(() => {
     if (isInitialized && !user && typeof window !== 'undefined' && isMounted.current) {
-      console.log("[AppStore Persist Local] Saving state to localStorage.");
+      // console.log("[AppStore Persist Local] Saving state to localStorage when user is not logged in.");
       try {
-        const settingsToSave = { ...state.settings, lastLocalSaveTimestamp: Date.now() };
-        localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsToSave));
+        // Prepare settings for localStorage, including the current timestamp for the save.
+        const settingsForLocalStorage = { ...state.settings, lastLocalSaveTimestamp: Date.now() };
+
+        localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsForLocalStorage));
         localStorage.setItem(LOCAL_STORAGE_PURCHASES_KEY, JSON.stringify(state.purchases));
         localStorage.setItem(LOCAL_STORAGE_MERCHANTS_KEY, JSON.stringify(state.merchants));
-        // Actualizar el estado local para que refleje el nuevo lastLocalSaveTimestamp
-        setState(prevState => ({...prevState, settings: settingsToSave}));
+
+        // DO NOT call setState here to update state.settings.lastLocalSaveTimestamp in memory,
+        // as state.settings is a dependency of this useEffect. Doing so would cause an infinite loop.
+        // The timestamp is correctly saved to localStorage.
+        // If settings data (e.g., monthlyAllowance) is changed by the user,
+        // `updateSettings` will update state.settings, and then this effect will persist it.
+
       } catch (error) {
         console.error("[AppStore Persist Local] FAILED to save state to localStorage:", error);
         toast({
@@ -173,6 +181,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const settingsDocRef = doc(firestoreDb, "users", user.uid, "settings", "main");
       await setDoc(settingsDocRef, { lastBackupTimestamp: Date.now() }, { merge: true });
+      // onSnapshot will update local state.settings
     } catch (error) {
       toast({ title: "Error", description: "No se pudo actualizar la fecha del último backup en la nube.", variant: "destructive" });
     }
@@ -182,11 +191,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!state.settings.autoBackupToDrive || !user || !user.uid || !user.email || !accessToken) return;
     const { db: firestoreDb } = ensureFirebaseInitialized();
     if (!firestoreDb) return;
+    // console.log("[AppStore AutoBackup] Triggering auto backup to Drive.");
     try {
       await triggerGoogleDriveBackupAction(
         user.uid, user.email, JSON.stringify(state.purchases),
         JSON.stringify(state.merchants), JSON.stringify(state.settings), accessToken
       );
+      // The updateLastBackupTimestamp is implicitly handled by the server action if successful,
+      // which then triggers onSnapshot for settings.
     } catch (error: any) {
       toast({ title: "Error de Auto-Backup a Drive", description: error.message || "Error inesperado.", variant: "destructive" });
     }
@@ -194,12 +206,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!isInitialized || !isMounted.current || !state.settings.autoBackupToDrive || !user) return;
-    const { db: firestoreDb } = ensureFirebaseInitialized();
-    if(!firestoreDb) return;
-
+    
     const purchasesChanged = JSON.stringify(state.purchases) !== JSON.stringify(previousPurchasesRef.current);
     const merchantsChanged = JSON.stringify(state.merchants) !== JSON.stringify(previousMerchantsRef.current);
-    if (purchasesChanged || merchantsChanged) handleAutoBackup();
+    
+    if (purchasesChanged || merchantsChanged) {
+      // console.log("[AppStore AutoBackup] Data changed, scheduling auto backup.");
+      handleAutoBackup();
+    }
     previousPurchasesRef.current = state.purchases;
     previousMerchantsRef.current = state.merchants;
   }, [state.purchases, state.merchants, state.settings.autoBackupToDrive, isInitialized, user, handleAutoBackup]);
@@ -211,9 +225,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user && user.uid) {
         const { db } = ensureFirebaseInitialized();
         firestoreDbInstance = db;
-        if (!firestoreDbInstance && !isFirestoreLoading) return; // Si es usuario logueado y db no está, pero no está cargando, algo anda mal.
+        if (!firestoreDbInstance && !isFirestoreLoading) return;
     }
-
 
     const now = new Date();
     const currentMonthYear = format(now, 'yyyy-MM');
@@ -234,10 +247,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }), 0);
 
         const newLastReminderMonth = currentMonthYear;
-        setState(prevState => ({ ...prevState, settings: { ...prevState.settings, lastEndOfMonthReminderShownForMonth: newLastReminderMonth }}));
+        // Update settings in memory and persist if necessary
+        const newSettings = { ...state.settings, lastEndOfMonthReminderShownForMonth: newLastReminderMonth };
         if (user && user.uid && firestoreDbInstance) {
           const settingsDocRef = doc(firestoreDbInstance, "users", user.uid, "settings", "main");
           setDoc(settingsDocRef, { lastEndOfMonthReminderShownForMonth: newLastReminderMonth }, { merge: true });
+          // onSnapshot will update local state
+        } else if (!user && typeof window !== 'undefined') {
+           setState(prevState => ({ ...prevState, settings: newSettings }));
+           // The localStorage persistence useEffect will pick this change up.
         }
       }
     }
@@ -245,18 +263,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addPurchase = useCallback(async (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount' | 'receiptImageUrl'> & { merchantLocation?: string, amount: number, date: string, merchantName: string, description?: string }): Promise<{success: boolean, message: string, purchaseId?: string}> => {
     const { db: firestoreDb } = ensureFirebaseInitialized();
+    // Calculations are now primarily done in server action or Firestore trigger if more complex.
+    // For local (non-user) mode, calculations are still needed here.
     const discountAmount = (purchaseData.amount * state.settings.discountPercentage) / 100;
     const newPurchaseCoreData: Omit<Purchase, 'id'> = {
       amount: purchaseData.amount, date: purchaseData.date, merchantName: purchaseData.merchantName.trim(),
       merchantLocation: purchaseData.merchantLocation?.trim() || undefined, description: purchaseData.description || undefined,
-      receiptImageUrl: undefined, discountApplied: parseFloat(discountAmount.toFixed(2)),
+      receiptImageUrl: undefined, // Assuming no image upload for now
+      discountApplied: parseFloat(discountAmount.toFixed(2)),
       finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
     };
 
     if (user && user.uid && firestoreDb) {
+      // For logged-in users, server action handles Firestore write.
+      // onSnapshot will update local state.
       return serverAddPurchaseAction(user.uid, { ...purchaseData, receiptImageUrl: undefined }, state.settings);
     } else {
-      const newPurchase: Purchase = { id: `local_${Date.now()}`, ...newPurchaseCoreData };
+      // For non-logged-in users, update local state.
+      const newPurchase: Purchase = { id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, ...newPurchaseCoreData };
       setState(prevState => {
         const updatedPurchases = [...prevState.purchases, newPurchase].sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
         const merchantExists = prevState.merchants.some(m => m.name === newPurchase.merchantName && (m.location || undefined) === (newPurchase.merchantLocation || undefined));
@@ -276,7 +300,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const updatedPurchaseCoreData: Omit<Purchase, 'id'> = {
       amount: purchaseData.amount, date: purchaseData.date, merchantName: purchaseData.merchantName.trim(),
       merchantLocation: purchaseData.merchantLocation?.trim() || undefined, description: purchaseData.description || undefined,
-      receiptImageUrl: undefined, discountApplied: parseFloat(discountAmount.toFixed(2)),
+      receiptImageUrl: undefined,
+      discountApplied: parseFloat(discountAmount.toFixed(2)),
       finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
     };
 
@@ -298,9 +323,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deletePurchase = useCallback(async (purchaseId: string): Promise<{success: boolean, message: string}> => {
     const { db: firestoreDb } = ensureFirebaseInitialized();
+    // console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}. User: ${user?.uid}`);
     if (user && user.uid && firestoreDb) {
+      // For logged-in users, server action handles Firestore delete.
+      // onSnapshot will update local state.
       return serverDeletePurchaseAction(user.uid, purchaseId);
     } else {
+      // For non-logged-in users, update local state.
       setState(prevState => ({ ...prevState, purchases: prevState.purchases.filter(p => p.id !== purchaseId) }));
       return { success: true, message: "Compra eliminada localmente." };
     }
@@ -308,34 +337,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateSettings = useCallback(async (newSettingsData: Partial<BenefitSettings>): Promise<{success: boolean, message: string, settings?: BenefitSettings}> => {
     const { db: firestoreDb } = ensureFirebaseInitialized();
-    const mergedSettings = { ...state.settings, ...newSettingsData };
+    const currentSettingsInMemory = state.settings; // Get current settings from memory
+    const mergedSettings = { ...currentSettingsInMemory, ...newSettingsData };
+
     if (user && user.uid && firestoreDb) {
-      // Para usuarios autenticados, la server action es la fuente de verdad para Firestore.
-      // onSnapshot actualizará el estado local.
-      // Pero queremos que el toast refleje el resultado de la server action.
+      // serverUpdateSettingsAction will write to Firestore.
+      // onSnapshot for settings will then update the local state.
       const actionResult = await serverUpdateSettingsAction(user.uid, mergedSettings);
-      // Si la acción tuvo éxito, el estado local debería actualizarse via onSnapshot.
-      // Si falló, el estado local NO debería cambiar.
-      // mergedSettings aquí solo se usa para la server action.
-      return { ...actionResult, settings: actionResult.success ? (actionResult.settings || mergedSettings) : state.settings };
+      return { ...actionResult, settings: actionResult.success ? (actionResult.settings || mergedSettings) : currentSettingsInMemory };
     } else {
-      // Para usuarios no autenticados, actualizamos el estado local directamente.
-      // El useEffect se encargará de persistirlo en localStorage.
+      // For non-logged-in users, update local state directly.
+      // The useEffect will persist it to localStorage.
       setState(prevState => ({ ...prevState, settings: mergedSettings }));
       return { success: true, message: "Configuración actualizada localmente.", settings: mergedSettings };
     }
-  }, [user, state.settings]);
+  }, [user, state.settings]); // Ensure state.settings is a dependency
 
   const addMerchant = useCallback(async (merchantName: string, merchantLocationInput?: string): Promise<{ success: boolean; merchant?: Merchant; message?: string }> => {
     const { db: firestoreDb } = ensureFirebaseInitialized();
     const trimmedName = merchantName.trim();
     const trimmedLocation = merchantLocationInput?.trim() || undefined;
     if (user && user.uid && firestoreDb) {
+      // For logged-in users, server action handles Firestore write.
+      // onSnapshot will update local state.
       return serverAddManualMerchantAction(user.uid, { name: trimmedName, location: trimmedLocation });
     } else {
       const existingMerchant = state.merchants.find(m => m.name === trimmedName && (m.location || undefined) === trimmedLocation);
       if (existingMerchant) return { success: false, merchant: existingMerchant, message: `El comercio ya existe localmente.` };
-      const newMerchant: Merchant = { id: `local_m_${Date.now()}`, name: trimmedName, location: trimmedLocation };
+      const newMerchant: Merchant = { id: `local_m_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, name: trimmedName, location: trimmedLocation };
       setState(prevState => ({ ...prevState, merchants: [...prevState.merchants, newMerchant].sort((a,b)=> a.name.localeCompare(b.name)) }));
       return { success: true, merchant: newMerchant, message: `Comercio añadido localmente.` };
     }
@@ -364,17 +393,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!user && state.purchases.length === 0 && state.merchants.length === 0) {
         toast({ title: "Sin Datos", description: "No hay datos locales para exportar." }); return;
     }
+    // Timestamp update for Drive is handled by its action.
+    // For local Excel backup, we update lastLocalSaveTimestamp in localStorage via the persistence effect.
     if (user && user.uid) {
-        await updateLastBackupTimestamp(); // Cloud backup timestamp
-    } else if (typeof window !== 'undefined') { // Local backup timestamp
-        setState(prevState => {
-            const newSettings = { ...prevState.settings, lastLocalSaveTimestamp: Date.now() };
-            try {
-              localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(newSettings));
-            } catch (e) { console.error("Failed to save local backup timestamp to localStorage", e); }
-            return { ...prevState, settings: newSettings };
-        });
+        await updateLastBackupTimestamp();
+    } else if (typeof window !== 'undefined') {
+        const settingsForLocalStorage = { ...state.settings, lastLocalSaveTimestamp: Date.now() };
+        localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsForLocalStorage));
+        // No need to setState here for lastLocalSaveTimestamp for local users,
+        // as it's primarily for the "last saved to disk" info.
+        // If displayed in UI, it would be from the loaded settings.
     }
+
     const purchasesSheet = XLSX.utils.json_to_sheet(state.purchases.map(p => ({
         ID: p.id, 'Monto Original': p.amount, Fecha: format(parseISO(p.date), 'yyyy-MM-dd HH:mm:ss'),
         Comercio: p.merchantName, 'Ubicación Compra': p.merchantLocation || '', Descripción: p.description || '',
@@ -386,7 +416,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     XLSX.utils.book_append_sheet(wb, merchantsSheet, "Comercios");
     XLSX.writeFile(wb, `LEDESC_Backup_${format(new Date(), 'yyyyMMdd_HHmmss')}.xlsx`);
     toast({ title: "Backup Exitoso", description: "Datos exportados a Excel." });
-  }, [state.purchases, state.merchants, toast, updateLastBackupTimestamp, user]);
+  }, [state.purchases, state.merchants, state.settings, toast, updateLastBackupTimestamp, user]);
 
   const restoreFromExcel = useCallback(async (file: File) => {
     const reader = new FileReader();
@@ -398,13 +428,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (!wb.SheetNames.includes("Compras") || !wb.SheetNames.includes("Comercios")) throw new Error("Hojas 'Compras'/'Comercios' no encontradas.");
         const purchasesJSON: any[] = XLSX.utils.sheet_to_json(wb.Sheets["Compras"]);
         const merchantsJSON: any[] = XLSX.utils.sheet_to_json(wb.Sheets["Comercios"]);
-        const restoredPurchases: Purchase[] = purchasesJSON.map((p: any, i) => ({
-            id: String(p.ID || `xl_p_${Date.now()}_${i}`), amount: Number(p['Monto Original'])||0,
-            date: (p.Fecha instanceof Date && isValid(p.Fecha)) ? p.Fecha.toISOString() : new Date().toISOString(),
-            merchantName: String(p.Comercio||"N/A"), merchantLocation: String(p['Ubicación Compra']||"")||undefined,
-            description: String(p.Descripción||"")||undefined, receiptImageUrl: String(p['URL Recibo']||"")||undefined,
-            discountApplied: Number(p['Descuento Aplicado'])||0, finalAmount: Number(p['Monto Final'])||0,
-        }));
+        
+        const restoredPurchases: Purchase[] = purchasesJSON.map((p: any, i) => {
+            let dateValue = p.Fecha;
+            if (typeof dateValue === 'number') { // Excel date serial number
+                dateValue = XLSX.SSF.parse_date_code(dateValue);
+                dateValue = new Date(dateValue.y, dateValue.m - 1, dateValue.d, dateValue.H, dateValue.M, dateValue.S);
+            } else if (typeof dateValue === 'string') {
+                dateValue = parseISO(dateValue); // Attempt to parse ISO string
+            }
+            // Ensure dateValue is a Date object before calling toISOString
+            const finalDateString = (dateValue instanceof Date && isValid(dateValue)) ? dateValue.toISOString() : new Date().toISOString();
+
+            return {
+                id: String(p.ID || `xl_p_${Date.now()}_${i}`), amount: Number(p['Monto Original'])||0,
+                date: finalDateString,
+                merchantName: String(p.Comercio||"N/A"), merchantLocation: String(p['Ubicación Compra']||"")||undefined,
+                description: String(p.Descripción||"")||undefined, receiptImageUrl: String(p['URL Recibo']||"")||undefined,
+                discountApplied: Number(p['Descuento Aplicado'])||0, finalAmount: Number(p['Monto Final'])||0,
+            };
+        });
+
         const restoredMerchants: Merchant[] = merchantsJSON.map((m: any, i) => ({
             id: String(m.ID || `xl_m_${Date.now()}_${i}`), name: String(m.Nombre||"N/A"),
             location: String(m.Ubicación||"")||undefined,
@@ -419,8 +463,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           restoredPurchases.forEach(p => { const {id, ...dataToSet} = p; batch.set(doc(purchasesCol, id), dataToSet); });
           restoredMerchants.forEach(m => { const {id, ...dataToSet} = m; batch.set(doc(merchantsCol, id), dataToSet); });
           await batch.commit();
+          // onSnapshot will update local state
         } else {
-          setState(prevState => ({ ...prevState, purchases: restoredPurchases, merchants: restoredMerchants }));
+          setState(prevState => ({ ...prevState, purchases: restoredPurchases.sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()), merchants: restoredMerchants.sort((a,b) => a.name.localeCompare(b.name)) }));
         }
         toast({ title: "Restauración Exitosa", description: `Datos restaurados desde Excel ${user ? 'a Firestore' : 'localmente'}.`});
       } catch (error: any) { toast({ title: "Error de Restauración", description: `No se pudo restaurar: ${error.message}`, variant: "destructive" }); }
@@ -430,10 +475,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, user]);
 
   const restoreFromDrive = useCallback(async (purchasesDataStr?: string, merchantsDataStr?: string, settingsDataStr?: string) => {
+    // This function is primarily called after a server action completes the Drive restore.
+    // The server action updates Firestore. onSnapshot handles updating local state for logged-in users.
+    // For non-logged-in users, this path shouldn't be hit as Drive restore requires auth.
     if (user && purchasesDataStr && merchantsDataStr && settingsDataStr) {
-      console.log("[AppStore] restoreFromDrive: Data received. Firestore updated by server action, local state by onSnapshot.");
+      // console.log("[AppStore] restoreFromDrive: Data received. Firestore updated by server action, local state by onSnapshot.");
+      // Potentially, could force a re-fetch or rely on onSnapshot.
     } else if (user) {
-      console.warn("[AppStore] restoreFromDrive: Called for authenticated user but data strings missing.");
+      // console.warn("[AppStore] restoreFromDrive: Called for authenticated user but data strings missing.");
     }
   }, [user]);
 
@@ -461,5 +510,3 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
-
-    
