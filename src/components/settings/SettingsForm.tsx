@@ -15,7 +15,7 @@ import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCa
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
+import { useRouter, usePathname } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -51,10 +51,10 @@ export function SettingsForm() {
     updateSettings: updateSettingsInStoreAndPotentiallyFirestore,
     restoreFromDrive: restoreFromDriveInStore,
   } = useAppDispatch();
-  const { user, accessToken, loading: authLoading, isFirebaseAuthReady, signIn } = useAuth(); // Added signIn
+  const { user, accessToken, loading: authLoading, isFirebaseAuthReady, signIn } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
-  const pathname = usePathname(); // Get current pathname
+  const pathname = usePathname();
 
   const [isSubmittingSettings, setIsSubmittingSettings] = useState(false);
   const [isInitialSetupScreen, setIsInitialSetupScreen] = useState(false);
@@ -84,29 +84,43 @@ export function SettingsForm() {
         const stillDefaultSettings = settings.monthlyAllowance === DEFAULT_BENEFIT_SETTINGS.monthlyAllowance &&
                                    settings.discountPercentage === DEFAULT_BENEFIT_SETTINGS.discountPercentage;
         
-        if (!setupComplete && stillDefaultSettings) {
+        if (!setupComplete && stillDefaultSettings && !user) { // Only force initial setup screen if not logged in and settings are default
           setIsInitialSetupScreen(true);
           if (pathname !== '/settings') router.push('/settings');
-        } else {
+        } else if (!setupComplete && user && pathname !== '/settings') { // If logged in but setup not complete, still go to settings.
+           setIsInitialSetupScreen(true);
+           if (pathname !== '/settings') router.push('/settings');
+        }
+        else {
           setIsInitialSetupScreen(false);
         }
       }
     }
-  }, [isAppStoreInitialized, settings, form, router, pathname]);
+  }, [isAppStoreInitialized, settings, form, router, pathname, user]);
 
 
   useEffect(() => {
     if (isAppStoreInitialized && settings) {
         const backupTimestamp = user ? settings.lastBackupTimestamp : settings.lastLocalSaveTimestamp;
-        const source = user ? "Firestore/Drive" : "Local";
         
         if (backupTimestamp && backupTimestamp > 0) {
             const newPurchases = purchases.filter(p => parseISO(p.date).getTime() > backupTimestamp);
+            
             const oldPurchaseMerchantKeys = new Set<string>();
-            purchases.forEach(p => { if(parseISO(p.date).getTime() <= backupTimestamp) oldPurchaseMerchantKeys.add(`${p.merchantName}-${p.merchantLocation || ''}`); });
+            purchases.forEach(p => { if(parseISO(p.date).getTime() <= backupTimestamp) oldPurchaseMerchantKeys.add(`${p.merchantName.toLowerCase()}-${(p.merchantLocation || '').toLowerCase()}`); });
+            
             const newOrUpdatedMerchants = new Set<string>();
-            purchases.forEach(p => { if(parseISO(p.date).getTime() > backupTimestamp) newOrUpdatedMerchants.add(`${p.merchantName}-${p.merchantLocation || ''}`); });
-            merchants.forEach(m => { if(!oldPurchaseMerchantKeys.has(`${m.name}-${m.location || ''}`)) newOrUpdatedMerchants.add(`${m.name}-${m.location || ''}`); });
+            // Count merchants from new purchases that weren't in old purchases
+            newPurchases.forEach(p => {
+                const key = `${p.merchantName.toLowerCase()}-${(p.merchantLocation || '').toLowerCase()}`;
+                if(!oldPurchaseMerchantKeys.has(key)) newOrUpdatedMerchants.add(key);
+            });
+            // Count merchants from the global list that are not associated with old purchases
+            merchants.forEach(m => { 
+                const key = `${m.name.toLowerCase()}-${(m.location || '').toLowerCase()}`;
+                if(!oldPurchaseMerchantKeys.has(key)) newOrUpdatedMerchants.add(key); 
+            });
+            
             setCounters({ newPurchasesCount: newPurchases.length, newMerchantsCount: newOrUpdatedMerchants.size });
         } else {
              setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
@@ -117,16 +131,21 @@ export function SettingsForm() {
 
   async function onSubmitSettings(data: SettingsFormData) {
     setIsSubmittingSettings(true);
-    let wasInitialSetupScreenBeforeSave = isInitialSetupScreen; // Capture state before save
+    let wasInitialSetupScreenBeforeSave = isInitialSetupScreen;
 
     try {
-      const result = await updateSettingsInStoreAndPotentiallyFirestore(data);
+      // The updateSettingsInStoreAndPotentiallyFirestore function now expects Partial<BenefitSettings>
+      // data is SettingsFormData. We need to merge it with existing settings if necessary or pass it as is
+      // if it covers all fields for non-Firestore updates.
+      // Since updateSettingsInStoreAndPotentiallyFirestore internally merges with state.settings,
+      // passing data (SettingsFormData) directly is fine for its logic.
+      const result = await updateSettingsInStoreAndPotentiallyFirestore(data as Partial<BenefitSettings>);
 
       if (result.success) {
         if (typeof window !== 'undefined') localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
-        setIsInitialSetupScreen(false); // Consistently turn off initial setup screen after successful save
+        setIsInitialSetupScreen(false);
 
-        if (!user) {
+        if (!user) { // User not logged in, settings saved locally
             toast({
                 title: "Configuración Guardada Localmente",
                 description: (
@@ -134,24 +153,25 @@ export function SettingsForm() {
                         <p>Tus configuraciones se han guardado en este navegador.</p>
                         <p className="mt-2">
                             <Info className="inline-block h-4 w-4 mr-1 align-text-bottom text-primary" />
-                            Para sincronizar tus datos entre dispositivos y habilitar backups en la nube, puedes {" "}
+                            Para sincronizar tus datos y habilitar backups en la nube, puedes {" "}
                             <Button variant="link" className="p-0 h-auto ml-0 inline text-primary hover:underline" onClick={signIn}>
                                 iniciar sesión con Google.
                             </Button>
                         </p>
                     </div>
                 ),
-                duration: 15000, // Longer duration for this important message
+                duration: 10000,
             });
-            if (wasInitialSetupScreenBeforeSave) router.push('/');
-        } else {
+        } else { // User logged in, settings saved to Firestore
             toast({ title: "Éxito", description: result.message || "Configuración guardada exitosamente." });
-            if (wasInitialSetupScreenBeforeSave) router.push('/');
         }
+        if (wasInitialSetupScreenBeforeSave) router.push('/');
+
       } else {
         toast({ title: "Error", description: result.message || "No se pudo actualizar la configuración.", variant: 'destructive' });
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Error submitting settings form:", error, "Stack:", error.stack);
       toast({ title: "Error Inesperado", description: "Ocurrió un error al actualizar la configuración.", variant: 'destructive' });
     } finally {
       setIsSubmittingSettings(false);
@@ -187,7 +207,12 @@ export function SettingsForm() {
     try {
       const result = await triggerGoogleDriveRestoreAction(user.uid, user.email, accessToken);
       if (result.success) {
-        restoreFromDriveInStore(result.purchasesData, result.merchantsData, result.settingsData);
+        // The restoreFromDriveInStore function in the store will be called by onSnapshot reacting to Firestore changes
+        // So, we don't need to call it directly here if the server action updated Firestore.
+        // However, the server action for restore *does* return the data.
+        // For now, the store's restoreFromDrive is a no-op if user is logged in as onSnapshot handles it.
+        // If it were to apply local state changes, it would be:
+        // restoreFromDriveInStore(result.purchasesData, result.merchantsData, result.settingsData);
         toast({ title: "Restauración desde Drive Exitosa", description: result.message });
       } else { toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o error.", variant: "destructive" }); }
     } catch (error: any) { toast({ title: "Error de Restauración desde Drive", description: error.message || "Error inesperado.", variant: "destructive" });
@@ -196,8 +221,12 @@ export function SettingsForm() {
 
   const handleSwitchChange = async (field: keyof Pick<BenefitSettings, "enableEndOfMonthReminder" | "autoBackupToDrive">, checked: boolean) => {
     form.setValue(field, checked, { shouldDirty: true, shouldValidate: true });
-    const currentFormValues = form.getValues();
-    const settingsPayload: SettingsFormData = { ...settings, ...currentFormValues, [field]: checked };
+    const currentFormValues = form.getValues(); // SettingsFormData
+    
+    // We need to pass a Partial<BenefitSettings> to updateSettingsInStoreAndPotentiallyFirestore
+    // So we create an object that only contains the changed field.
+    const settingsPayload: Partial<BenefitSettings> = { [field]: checked };
+
     const result = await updateSettingsInStoreAndPotentiallyFirestore(settingsPayload);
     if (result.success) {
         let message = field === "enableEndOfMonthReminder" ? `Recordatorio fin de mes ${checked ? 'activado' : 'desactivado'}.` : `Backup automático a Drive ${checked ? 'activado' : 'desactivado'}.`;
@@ -258,7 +287,7 @@ export function SettingsForm() {
                 <FormField control={form.control} name="enableEndOfMonthReminder" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"> <div className="space-y-0.5"> <FormLabel className="text-base flex items-center"><CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes</FormLabel> <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription> </div> <FormControl><Switch checked={field.value} onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)} /></FormControl> </FormItem> )} />
                 {watchEnableEndOfMonthReminder && ( <FormField control={form.control} name="daysBeforeEndOfMonthToRemind" render={({ field }) => ( <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3"> <FormLabel>Días antes para recordar</FormLabel> <FormControl><Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl><FormMessage /></FormItem> )} /> )}
                 <FormField control={form.control} name="autoBackupToDrive" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"> <div className="space-y-0.5"> <FormLabel className="text-base">Backup Automático a Google Drive</FormLabel> <FormDescription>Requiere inicio de sesión con Google.</FormDescription> </div> <FormControl><Switch checked={field.value} disabled={!user} onCheckedChange={(c) => handleSwitchChange("autoBackupToDrive", c)} /></FormControl> </FormItem> )} />
-                {!user && watchAutoBackupToDrive && ( <p className="text-xs text-orange-600 dark:text-orange-400 px-4 -mt-3"><AlertTriangle className="inline-block h-3 w-3 mr-1" />Backup automático requiere inicio de sesión.</p> )}
+                {!user && watchAutoBackupToDrive && form.getValues("autoBackupToDrive") && ( <p className="text-xs text-orange-600 dark:text-orange-400 px-4 -mt-3"><AlertTriangle className="inline-block h-3 w-3 mr-1" />Backup automático requiere inicio de sesión.</p> )}
               </div>
               <Button type="submit" className="w-full" disabled={isSubmittingSettings}> {isSubmittingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isSubmittingSettings ? 'Guardando...' : (isInitialSetupScreen ? 'Guardar y Continuar' : 'Guardar Configuración')} </Button>
             </form>
@@ -269,7 +298,7 @@ export function SettingsForm() {
       <Card className="shadow-lg">
         <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y restaura tus datos.</CardDescription> </CardHeader>
         <CardContent className="space-y-6">
-          <div className="p-3 border rounded-md bg-muted/50 text-sm"> <p className="mb-2 font-medium">{lastBackupDisplay}</p> <div className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2 text-primary" /><span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup.</span></div> {watchAutoBackupToDrive && user && ( <div className="flex items-center mt-2 text-green-700 dark:text-green-400"><RefreshCw className="h-4 w-4 mr-2 animate-spin" /><span>Backup automático a Drive ACTIVO.</span></div> )} {watchAutoBackupToDrive && !user && ( <div className="flex items-center mt-2 text-orange-600 dark:text-orange-400"><AlertTriangle className="h-4 w-4 mr-2" /><span>Backup automático a Drive requiere inicio de sesión.</span></div> )} </div>
+          <div className="p-3 border rounded-md bg-muted/50 text-sm"> <p className="mb-2 font-medium">{lastBackupDisplay}</p> <div className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2 text-primary" /><span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup.</span></div> {watchAutoBackupToDrive && user && form.getValues("autoBackupToDrive") && ( <div className="flex items-center mt-2 text-green-700 dark:text-green-400"><RefreshCw className="h-4 w-4 mr-2 animate-spin" /><span>Backup automático a Drive ACTIVO.</span></div> )} {watchAutoBackupToDrive && !user && form.getValues("autoBackupToDrive") && ( <div className="flex items-center mt-2 text-orange-600 dark:text-orange-400"><AlertTriangle className="h-4 w-4 mr-2" /><span>Backup automático a Drive requiere inicio de sesión.</span></div> )} </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><UploadCloud className="mr-2 h-5 w-5 text-primary"/>Realizar Backup</h4> <Separator /> <div className="space-y-3"> <Button onClick={handleExcelBackup} className="w-full" variant="outline"><FileDown className="mr-2 h-4 w-4" />A Excel (Local)</Button> <Button onClick={handleGoogleDriveBackup} className="w-full" variant="outline" disabled={!user || isBackingUpToDrive || authLoading}>{isBackingUpToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{isBackingUpToDrive ? 'Realizando backup...' : 'A Google Drive'}</Button> {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión para backup en Drive.</p>} </div> </div>
             <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary"/>Restaurar Datos</h4> <Separator /> <div className="space-y-3">
