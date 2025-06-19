@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { DollarSign, PieChart, TrendingUp, CalendarClock } from 'lucide-react';
 import { format, parseISO, isSameMonth, getDaysInMonth, getDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile'; // Corrected import
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
 interface ClientCalculatedData {
@@ -85,7 +85,7 @@ export function BenefitUsageSummary() {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="flex flex-col items-start p-4 border border-primary rounded-lg shadow-sm bg-primary/5 dark:bg-primary/10">
+          <div className="flex flex-col items-start p-4 border border-primary rounded-lg shadow-sm bg-primary/10 dark:bg-primary/15">
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Gastado este Mes</span>
               <DollarSign className="h-5 w-5 text-primary" />
@@ -93,7 +93,7 @@ export function BenefitUsageSummary() {
             <p className="text-2xl font-bold text-primary">{formatCurrency(clientData.totalSpentThisMonth)}</p>
           </div>
 
-          <div className="flex flex-col items-start p-4 border border-accent rounded-lg shadow-sm bg-accent/5 dark:bg-accent/10">
+          <div className="flex flex-col items-start p-4 border border-accent rounded-lg shadow-sm bg-accent/10 dark:bg-accent/15">
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Saldo Restante</span>
               <PieChart className="h-5 w-5 text-accent" />
@@ -101,7 +101,7 @@ export function BenefitUsageSummary() {
             <p className="text-2xl font-bold text-accent">{formatCurrency(clientData.remainingBalance)}</p>
           </div>
           
-          <div className="flex flex-col items-start p-4 border border-green-500 rounded-lg shadow-sm bg-green-500/5 dark:bg-green-700/10">
+          <div className="flex flex-col items-start p-4 border border-green-500 rounded-lg shadow-sm bg-green-500/10 dark:bg-green-700/15">
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Beneficio Total</span>
               <TrendingUp className="h-5 w-5 text-green-500" />
@@ -131,3 +131,4 @@ export function BenefitUsageSummary() {
     </Card>
   );
 }
+
