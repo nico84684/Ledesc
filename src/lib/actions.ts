@@ -64,15 +64,13 @@ export async function editPurchaseAction(purchaseId: string, data: PurchaseFormD
 
 export async function deletePurchaseAction(purchaseId: string): Promise<{ success: boolean; message: string }> {
   console.log(`[Server Action] deletePurchaseAction called for ID: ${purchaseId}`);
-  // En una aplicación real, aquí se realizaría la eliminación en la base de datos.
-  // Por ahora, solo simulamos el éxito.
+  // En una aplicación real, la eliminación en la base de datos ocurriría aquí.
+  // Para este prototipo, simulamos el éxito.
 
-  // Revalidar rutas que podrían mostrar datos de compras
   revalidatePath('/'); 
   revalidatePath('/history'); 
-  revalidatePath('/merchants'); 
 
-  return { success: true, message: "Compra eliminada exitosamente desde el servidor." };
+  return { success: true, message: "Compra eliminada exitosamente." };
 }
 
 
@@ -211,3 +209,4 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
     return { success: false, message: "Hubo un problema inesperado al intentar enviar tu mensaje. Por favor, intenta más tarde." };
   }
 }
+

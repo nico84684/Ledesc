@@ -21,8 +21,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // AlertDialogTrigger is used directly
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -103,16 +102,14 @@ export function TransactionHistoryTable() {
     console.log(`[TransactionHistoryTable] handleDeletePurchase called for ID: ${purchaseId}`);
     setIsDeleting(true);
     try {
-      console.log(`[TransactionHistoryTable] Calling deletePurchaseAction for ID: ${purchaseId}`);
       const result = await deletePurchaseAction(purchaseId);
       console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseId}:`, result);
 
       if (result.success) {
-        console.log(`[TransactionHistoryTable] Deleting purchase ID ${purchaseId} from client store.`);
         deletePurchaseFromStore(purchaseId);
-        toast({ title: "Éxito", description: result.message });
+        toast({ title: "Eliminación Exitosa", description: result.message });
       } else {
-        toast({ title: "Error", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
+        toast({ title: "Error al Eliminar", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
       }
     } catch (error: any) {
       console.error(`[TransactionHistoryTable] Error deleting purchase ID ${purchaseId}:`, error);
@@ -284,18 +281,16 @@ export function TransactionHistoryTable() {
                         </TooltipContent>
                       </Tooltip>
                       <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                           <Tooltip>
+                        <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive">
                                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent>
-                              <p>Eliminar Compra</p>
+                                <p>Eliminar Compra</p>
                             </TooltipContent>
-                          </Tooltip>
-                        </AlertDialogTrigger>
+                        </Tooltip>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
@@ -308,7 +303,6 @@ export function TransactionHistoryTable() {
                             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={() => {
-                                console.log(`[TransactionHistoryTable] Delete button clicked for purchase ID: ${purchase.id}`);
                                 handleDeletePurchase(purchase.id);
                               }}
                               disabled={isDeleting}

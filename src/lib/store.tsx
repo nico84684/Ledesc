@@ -364,15 +364,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, addMerchantInternal]);
 
   const deletePurchase = useCallback((purchaseId: string) => {
-    console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
+    console.log(`[AppStore] Attempting to delete purchase with ID: ${purchaseId}`);
     setState(prevState => {
-      console.log(`[AppStore] Current purchases before delete:`, prevState.purchases.map(p => p.id));
-      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
-      console.log(`[AppStore] Purchases after attempting to filter ID ${purchaseId}:`, updatedPurchases.map(p => p.id));
-      if (prevState.purchases.length === updatedPurchases.length && prevState.purchases.some(p => p.id === purchaseId)) {
-          console.warn(`[AppStore] Purchase ID ${purchaseId} was found but not removed. Filter logic might be incorrect or ID comparison failed.`);
-      } else if (!prevState.purchases.some(p => p.id === purchaseId)) {
-          console.warn(`[AppStore] Purchase ID ${purchaseId} not found in store for deletion.`);
+      const initialCount = prevState.purchases.length;
+      const updatedPurchases = prevState.purchases.filter(p => {
+        // console.log(`[AppStore] Comparing ${p.id} with ${purchaseId}. Match: ${p.id === purchaseId}`);
+        return p.id !== purchaseId;
+      });
+      const finalCount = updatedPurchases.length;
+
+      if (initialCount === finalCount && prevState.purchases.some(p => p.id === purchaseId)) {
+        console.warn(`[AppStore] Purchase ID ${purchaseId} was found but the filter did not remove it. This is unexpected.`);
+      } else if (initialCount > finalCount) {
+         console.log(`[AppStore] Purchase ID ${purchaseId} successfully removed from client state. Count before: ${initialCount}, after: ${finalCount}.`);
+      } else {
+         console.log(`[AppStore] Purchase ID ${purchaseId} not found or no change in count. Count before: ${initialCount}, after: ${finalCount}.`);
       }
       return { ...prevState, purchases: updatedPurchases };
     });
