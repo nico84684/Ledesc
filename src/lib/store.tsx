@@ -156,7 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
         if (!setupComplete && pathname !== '/settings') {
-            router.push('/settings');
+            if (typeof window !== 'undefined') router.push('/settings');
         }
 
         if (isMounted.current) { 
@@ -172,7 +172,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 }
             }
         } else {
-             if (!localStorage.getItem(LOCAL_STORAGE_KEY)) { 
+             if (typeof window !== 'undefined' && !localStorage.getItem(LOCAL_STORAGE_KEY)) { 
                 previousPurchasesRef.current = [];
                 previousMerchantsRef.current = [];
             }
@@ -366,21 +366,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, addMerchantInternal]);
 
   const deletePurchase = useCallback((purchaseId: string) => {
-    console.log(`[AppStore] Attempting to delete purchase with ID: ${purchaseId}`);
+    console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
     setState(prevState => {
-      const initialCount = prevState.purchases.length;
-      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
-      const finalCount = updatedPurchases.length;
+      const initialPurchases = prevState.purchases;
+      const updatedPurchases = initialPurchases.filter(p => p.id !== purchaseId);
 
-      if (initialCount === finalCount && prevState.purchases.some(p => p.id === purchaseId)) {
-        console.warn(`[AppStore] Purchase ID ${purchaseId} was found but the filter did not remove it. This is unexpected.`);
-         return prevState; // Devuelve el estado anterior si no hubo cambios para evitar re-renders innecesarios
-      } else if (initialCount > finalCount) {
-         console.log(`[AppStore] Purchase ID ${purchaseId} successfully removed from client state. Count before: ${initialCount}, after: ${finalCount}.`);
-      } else {
-         console.log(`[AppStore] Purchase ID ${purchaseId} not found or no change in count. Count before: ${initialCount}, after: ${finalCount}.`);
-         return prevState; // Devuelve el estado anterior si no hubo cambios
+      if (initialPurchases.length === updatedPurchases.length) {
+        // Esto significa que la compra no se encontró o el ID no coincidió.
+        // Podría ser un indicio de un problema si se esperaba que la compra existiera.
+        console.warn(`[AppStore] Purchase with ID: ${purchaseId} not found in state, or filter did not remove it. No state change.`);
+        return prevState; // Devuelve el estado anterior para evitar re-renders innecesarios.
       }
+      
+      console.log(`[AppStore] Purchase with ID: ${purchaseId} removed from state. Old count: ${initialPurchases.length}, New count: ${updatedPurchases.length}`);
       return { ...prevState, purchases: updatedPurchases };
     });
   }, []);
