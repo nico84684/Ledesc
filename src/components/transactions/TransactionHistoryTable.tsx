@@ -28,7 +28,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // No se usa directamente aquí para el botón de la fila
 } from "@/components/ui/alert-dialog";
 import { deletePurchaseAction } from '@/lib/actions';
 
@@ -101,6 +101,7 @@ export function TransactionHistoryTable() {
   };
 
   const handleDeleteClick = (purchase: Purchase) => {
+    console.log(`[TransactionHistoryTable] handleDeleteClick called for ID: ${purchase.id}`);
     setSelectedPurchaseForDelete(purchase);
   };
 
@@ -291,11 +292,16 @@ export function TransactionHistoryTable() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                           <AlertDialogTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(purchase)} disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id}>
-                               {isDeleting && selectedPurchaseForDelete?.id === purchase.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
-                            </Button>
-                          </AlertDialogTrigger>
+                          {/* Se eliminó AlertDialogTrigger de aquí */}
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive" 
+                            onClick={() => handleDeleteClick(purchase)} 
+                            disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id}
+                          >
+                            {isDeleting && selectedPurchaseForDelete?.id === purchase.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Eliminar Compra</p>
@@ -356,6 +362,7 @@ export function TransactionHistoryTable() {
         />
       )}
       
+      {/* El AlertDialog se mantiene aquí, controlado por selectedPurchaseForDelete */}
       {selectedPurchaseForDelete && (
         <AlertDialog open={!!selectedPurchaseForDelete} onOpenChange={(open) => { if (!open) setSelectedPurchaseForDelete(null); }}>
           <AlertDialogContent>
