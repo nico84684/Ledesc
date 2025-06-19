@@ -100,17 +100,23 @@ export function TransactionHistoryTable() {
   };
 
   const handleDeletePurchase = async (purchaseId: string) => {
+    console.log(`[TransactionHistoryTable] handleDeletePurchase called for ID: ${purchaseId}`);
     setIsDeleting(true);
     try {
+      console.log(`[TransactionHistoryTable] Calling deletePurchaseAction for ID: ${purchaseId}`);
       const result = await deletePurchaseAction(purchaseId);
+      console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseId}:`, result);
+
       if (result.success) {
+        console.log(`[TransactionHistoryTable] Deleting purchase ID ${purchaseId} from client store.`);
         deletePurchaseFromStore(purchaseId);
         toast({ title: "Éxito", description: result.message });
       } else {
         toast({ title: "Error", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
       }
     } catch (error: any) {
-      toast({ title: "Error Inesperado", description: "Ocurrió un error al intentar eliminar la compra.", variant: "destructive" });
+      console.error(`[TransactionHistoryTable] Error deleting purchase ID ${purchaseId}:`, error);
+      toast({ title: "Error Inesperado", description: `Ocurrió un error al intentar eliminar la compra: ${error.message}`, variant: "destructive" });
     } finally {
       setIsDeleting(false);
     }
@@ -301,7 +307,10 @@ export function TransactionHistoryTable() {
                           <AlertDialogFooter>
                             <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => handleDeletePurchase(purchase.id)}
+                              onClick={() => {
+                                console.log(`[TransactionHistoryTable] Delete button clicked for purchase ID: ${purchase.id}`);
+                                handleDeletePurchase(purchase.id);
+                              }}
                               disabled={isDeleting}
                               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
                             >

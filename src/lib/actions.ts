@@ -13,7 +13,7 @@ import { APP_NAME } from '@/config/constants';
 import { Resend } from 'resend';
 
 export async function addPurchaseAction(data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
-  console.log("Server Action: addPurchaseAction called with data:", data);
+  console.log("[Server Action] addPurchaseAction called with data:", data);
   
   const receiptImageUrl: string | undefined = undefined;
 
@@ -38,7 +38,7 @@ export async function addPurchaseAction(data: PurchaseFormData, currentSettings:
 }
 
 export async function editPurchaseAction(purchaseId: string, data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchase?: Purchase }> {
-  console.log("Server Action: editPurchaseAction called for ID:", purchaseId, "with data:", data);
+  console.log("[Server Action] editPurchaseAction called for ID:", purchaseId, "with data:", data);
 
   const receiptImageUrl: string | undefined = undefined; // Asumimos que no se edita la imagen o se maneja por separado
 
@@ -62,19 +62,22 @@ export async function editPurchaseAction(purchaseId: string, data: PurchaseFormD
   return { success: true, message: "Compra actualizada exitosamente.", purchase: updatedPurchase };
 }
 
-export async function deletePurchaseAction(purchaseId: string): Promise<{ success: boolean; message: string; purchaseId?: string }> {
-  console.log("Server Action: deletePurchaseAction called for ID:", purchaseId);
+export async function deletePurchaseAction(purchaseId: string): Promise<{ success: boolean; message: string }> {
+  console.log(`[Server Action] deletePurchaseAction called for ID: ${purchaseId}`);
+  // En una aplicación real, aquí se realizaría la eliminación en la base de datos.
+  // Por ahora, solo simulamos el éxito.
 
-  revalidatePath('/');
-  revalidatePath('/history');
-  revalidatePath('/merchants');
+  // Revalidar rutas que podrían mostrar datos de compras
+  revalidatePath('/'); 
+  revalidatePath('/history'); 
+  revalidatePath('/merchants'); 
 
-  return { success: true, message: "Compra eliminada exitosamente.", purchaseId };
+  return { success: true, message: "Compra eliminada exitosamente desde el servidor." };
 }
 
 
 export async function updateSettingsAction(data: SettingsFormData): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
-  console.log("Server Action: updateSettingsAction called with data:", data);
+  console.log("[Server Action] updateSettingsAction called with data:", data);
   
   const updatedSettings: BenefitSettings = {
     monthlyAllowance: data.monthlyAllowance,
@@ -93,7 +96,7 @@ export async function updateSettingsAction(data: SettingsFormData): Promise<{ su
 }
 
 export async function addManualMerchantAction(data: AddMerchantFormData): Promise<{ success: boolean; message: string; merchant?: Merchant }> {
-  console.log("Server Action: addManualMerchantAction called with data:", data);
+  console.log("[Server Action] addManualMerchantAction called with data:", data);
 
   const newMerchant: Merchant = {
     id: new Date().toISOString() + Math.random().toString(),
@@ -174,8 +177,6 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
 
   if (!resendApiKey) {
     console.error("Error: RESEND_API_KEY no está configurada en las variables de entorno.");
-    // En producción, es crucial no exponer detalles del error al cliente.
-    // Podrías retornar un mensaje genérico o loggear el error internamente.
     return { success: false, message: "El servicio de envío de correo no está configurado correctamente. Por favor, contacta al administrador." };
   }
 
@@ -183,7 +184,7 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
 
   try {
     const emailData = await resend.emails.send({
-      from: `Contacto ${APP_NAME} <onboarding@resend.dev>`, // Puedes cambiar 'onboarding@resend.dev' si verificas un dominio en Resend
+      from: `Contacto ${APP_NAME} <onboarding@resend.dev>`, 
       to: [targetEmail],
       subject: `Nuevo mensaje de Contacto (${APP_NAME}): ${data.reason}`,
       reply_to: data.email,
@@ -202,12 +203,11 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
       return { success: false, message: `Hubo un problema al enviar tu mensaje: ${emailData.error.message}` };
     }
 
-    console.log(`Correo enviado exitosamente a ${targetEmail} a través de Resend. ID: ${emailData.data?.id}`);
+    console.log(`[Server Action] Correo enviado exitosamente a ${targetEmail} a través de Resend. ID: ${emailData.data?.id}`);
     return { success: true, message: `Gracias por tu mensaje sobre "${data.reason}". Ha sido enviado.` };
 
   } catch (error: any) {
-    console.error("Excepción al intentar enviar correo con Resend:", error);
-    // Aquí también, cuidado con exponer detalles del error al cliente.
+    console.error("[Server Action] Excepción al intentar enviar correo con Resend:", error);
     return { success: false, message: "Hubo un problema inesperado al intentar enviar tu mensaje. Por favor, intenta más tarde." };
   }
 }

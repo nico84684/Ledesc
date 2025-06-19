@@ -364,9 +364,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, addMerchantInternal]);
 
   const deletePurchase = useCallback((purchaseId: string) => {
+    console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
     setState(prevState => {
+      console.log(`[AppStore] Current purchases before delete:`, prevState.purchases.map(p => p.id));
       const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
-      // No es necesario actualizar comercios aquí, ya que eliminar una compra no elimina el comercio.
+      console.log(`[AppStore] Purchases after attempting to filter ID ${purchaseId}:`, updatedPurchases.map(p => p.id));
+      if (prevState.purchases.length === updatedPurchases.length && prevState.purchases.some(p => p.id === purchaseId)) {
+          console.warn(`[AppStore] Purchase ID ${purchaseId} was found but not removed. Filter logic might be incorrect or ID comparison failed.`);
+      } else if (!prevState.purchases.some(p => p.id === purchaseId)) {
+          console.warn(`[AppStore] Purchase ID ${purchaseId} not found in store for deletion.`);
+      }
       return { ...prevState, purchases: updatedPurchases };
     });
   }, []);
