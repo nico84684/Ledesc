@@ -6,9 +6,9 @@ import { useAppState, useAppDispatch } from '@/lib/store';
 import type { Purchase } from '@/types';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCaption } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Eye } from 'lucide-react'; 
+import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Eye, Trash2, Loader2 } from 'lucide-react'; 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -19,13 +19,25 @@ import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog';
 import { TransactionDetailsDialog } from './TransactionDetailsDialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { deletePurchaseAction } from '@/lib/actions';
 
 const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
 
 export function TransactionHistoryTable() {
   const { purchases, settings } = useAppState();
-  const { exportToCSV, isInitialized } = useAppDispatch(); // deletePurchaseFromStore removed
+  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStore } = useAppDispatch();
   const { toast } = useToast();
   
   const [filterMonth, setFilterMonth] = useState<string>('');
@@ -38,8 +50,10 @@ export function TransactionHistoryTable() {
   
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState<Purchase | null>(null);
+  
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [selectedPurchaseForDelete, setSelectedPurchaseForDelete] = useState<Purchase | null>(null);
 
-  // isDeleting state and handleDeletePurchase function removed
 
   const uniqueMonths = useMemo(() => {
     const months = new Set<string>();
@@ -85,6 +99,35 @@ export function TransactionHistoryTable() {
     setSelectedPurchaseForDetails(purchase);
     setIsDetailsDialogOpen(true);
   };
+
+  const handleDeleteClick = (purchase: Purchase) => {
+    setSelectedPurchaseForDelete(purchase);
+  };
+
+  const confirmDeletePurchase = async () => {
+    if (!selectedPurchaseForDelete) return;
+    const purchaseIdToDelete = selectedPurchaseForDelete.id;
+    console.log(`[TransactionHistoryTable] confirmDeletePurchase called for ID: ${purchaseIdToDelete}`);
+    setIsDeleting(true);
+    try {
+      const result = await deletePurchaseAction(purchaseIdToDelete);
+      console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseIdToDelete}:`, result);
+
+      if (result.success) {
+        deletePurchaseFromStore(purchaseIdToDelete);
+        toast({ title: "Eliminación Exitosa", description: result.message });
+      } else {
+        toast({ title: "Error al Eliminar", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
+      }
+    } catch (error: any) {
+      console.error(`[TransactionHistoryTable] Error deleting purchase ID ${purchaseIdToDelete}:`, error);
+      toast({ title: "Error Inesperado", description: `Ocurrió un error al intentar eliminar la compra: ${error.message}`, variant: "destructive" });
+    } finally {
+      setSelectedPurchaseForDelete(null);
+      setIsDeleting(false);
+    }
+  };
+
 
   if (!isInitialized) {
     return (
@@ -246,7 +289,18 @@ export function TransactionHistoryTable() {
                           <p>Editar Compra</p>
                         </TooltipContent>
                       </Tooltip>
-                      {/* Delete Button and AlertDialog removed */}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive" onClick={() => handleDeleteClick(purchase)} disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id}>
+                               {isDeleting && selectedPurchaseForDelete?.id === purchase.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
+                            </Button>
+                          </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Eliminar Compra</p>
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -300,6 +354,26 @@ export function TransactionHistoryTable() {
             if (!open) setSelectedPurchaseForDetails(null);
           }}
         />
+      )}
+      
+      {selectedPurchaseForDelete && (
+        <AlertDialog open={!!selectedPurchaseForDelete} onOpenChange={(open) => { if (!open) setSelectedPurchaseForDelete(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta compra?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer. La compra realizada el {format(parseISO(selectedPurchaseForDelete.date), "dd 'de' MMMM 'de' yyyy", { locale: es })} por {formatCurrency(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setSelectedPurchaseForDelete(null)} disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={confirmDeletePurchase} disabled={isDeleting} className={buttonVariants({ variant: "destructive" })}>
+                {isDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Eliminar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
     </div>
     </TooltipProvider>

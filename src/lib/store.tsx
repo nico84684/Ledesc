@@ -18,7 +18,7 @@ import type { PurchaseFormData } from './schemas'; // Import PurchaseFormData
 interface AppDispatchContextType {
   addPurchase: (purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'> & { merchantLocation?: string }) => void;
   editPurchase: (purchaseId: string, purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount'>) => void;
-  // deletePurchase removed from context type
+  deletePurchase: (purchaseId: string) => void;
   updateSettings: (newSettings: Partial<BenefitSettings>) => void;
   addMerchant: (merchantName: string, merchantLocation?: string) => { success: boolean; merchant?: Merchant; message?: string };
   exportToCSV: () => void;
@@ -158,9 +158,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
         console.log('[AppStore Persist Effect] State successfully saved to localStorage.');
       } catch (e) {
-        console.error('[AppStore Persist Effect] FAILED to save state to localStorage. This will prevent data from persisting (e.g., deletions). Error:', e);
-        // Consider a more user-facing notification if this error is critical and persistent
-        // toast({ title: "Error de Almacenamiento", description: "No se pudo guardar el estado de la aplicación. Los cambios podrían no persistir.", variant: "destructive", duration: 10000 });
+        console.error('[AppStore Persist Effect] FAILED to save state to localStorage. This will prevent data from persisting. Error:', e);
+        toast({ title: "Error Crítico de Almacenamiento", description: "No se pudo guardar el estado de la aplicación en localStorage. Los cambios, incluyendo eliminaciones, podrían no persistir. Por favor, revisa los permisos de almacenamiento de tu navegador o si estás en modo incógnito con restricciones.", variant: "destructive", duration: 15000 });
       }
 
       try {
@@ -198,7 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } else if (isInitialized) {
       console.warn('[AppStore Persist Effect] Skipping localStorage operations: window is undefined.');
     }
-  }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup]);
+  }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup, toast]);
 
 
   // Effect for End of Month Reminder
@@ -383,22 +382,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }, [toast, addMerchantInternal]);
 
-  // deletePurchase function removed
-  // const deletePurchase = useCallback((purchaseId: string) => {
-  //   console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
-  //   setState(prevState => {
-  //     const initialPurchasesCount = prevState.purchases.length;
-  //     const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
-  // 
-  //     if (initialPurchasesCount === updatedPurchases.length) {
-  //       console.warn(`[AppStore] Purchase with ID: ${purchaseId} not found in state, or filter did not remove it. No state change.`);
-  //       return prevState; 
-  //     }
-  //     
-  //     console.log(`[AppStore] Purchase with ID: ${purchaseId} removed from state. Old count: ${initialPurchasesCount}, New count: ${updatedPurchases.length}`);
-  //     return { ...prevState, purchases: updatedPurchases };
-  //   });
-  // }, []);
+  const deletePurchase = useCallback((purchaseId: string) => {
+    console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
+    setState(prevState => {
+      const initialPurchasesCount = prevState.purchases.length;
+      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
+
+      if (initialPurchasesCount === updatedPurchases.length) {
+        console.warn(`[AppStore] Purchase with ID: ${purchaseId} not found in state, or filter did not remove it. No state change.`);
+        return prevState; 
+      }
+      
+      console.log(`[AppStore] Purchase with ID: ${purchaseId} removed from state. Old count: ${initialPurchasesCount}, New count: ${updatedPurchases.length}`);
+      return { ...prevState, purchases: updatedPurchases };
+    });
+  }, []);
 
 
   const updateSettings = useCallback((newSettingsData: Partial<BenefitSettings>) => {
@@ -642,7 +640,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   return (
     <AppStateContext.Provider value={state}>
-      <AppDispatchContext.Provider value={{ addPurchase, editPurchase, /* deletePurchase removed */ updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel, restoreFromDrive, updateLastBackupTimestamp }}>
+      <AppDispatchContext.Provider value={{ addPurchase, editPurchase, deletePurchase, updateSettings, addMerchant, exportToCSV, isInitialized, backupToExcel, restoreFromExcel, restoreFromDrive, updateLastBackupTimestamp }}>
         {children}
       </AppDispatchContext.Provider>
     </AppStateContext.Provider>
