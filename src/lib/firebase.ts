@@ -1,7 +1,7 @@
 
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth"; // Import getAuth
+import { getAuth, type Auth } from "firebase/auth"; // Import Auth type
 import { getAnalytics, type Analytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
@@ -16,50 +16,70 @@ const firebaseConfig = {
   measurementId: "G-Y8NS9CH2WF"
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
-if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
-  console.log("[Firebase] App initialized.");
-} else {
-  app = getApps()[0];
-  console.log("[Firebase] App already initialized.");
+// Declare Firebase services without initializing them
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let analytics: Analytics | undefined;
+
+export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, auth: Auth | undefined } {
+  if (typeof window === 'undefined') {
+    // console.log("[Firebase Core] Not initializing on server.");
+    return { app, auth };
+  }
+  if (app && auth) { // Check if both app and auth are already initialized
+    // console.log("[Firebase Core] App and Auth already initialized.");
+    return { app, auth };
+  }
+
+  try {
+    if (getApps().length === 0) {
+      app = initializeApp(firebaseConfig);
+      console.log("[Firebase Core] App initialized.");
+    } else {
+      app = getApps()[0];
+      console.log("[Firebase Core] App instance retrieved.");
+    }
+    // Initialize auth only if app is successfully initialized/retrieved
+    if (app && !auth) { 
+        auth = getAuth(app);
+        console.log("[Firebase Core] Auth initialized.");
+    }
+  } catch (error) {
+    console.error("[Firebase Core] Error initializing Firebase App or Auth:", error);
+    // app and auth might remain undefined or partially defined
+  }
+  return { app, auth };
 }
 
-// Initialize Firebase Authentication and get a reference to the service
-const auth = getAuth(app);
-console.log("[Firebase] Auth initialized.");
-
-// REMINDER: To fix (auth/unauthorized-domain) errors,
-// you MUST add your application's domain (e.g., from Firebase Studio or your hosting provider)
-// to the list of "Authorized domains" in the Firebase Console:
-// Firebase Console -> Your Project -> Authentication -> Sign-in method -> Authorized domains.
-
-export let analytics: Analytics | undefined; // Declare analytics, but don't initialize here
 
 export function ensureAnalyticsInitialized(): Analytics | undefined {
   if (typeof window === 'undefined') {
     // console.log("[Firebase Analytics] Not initializing on server.");
     return undefined;
   }
-  if (analytics) {
-    // console.log("[Firebase Analytics] Already initialized.");
-    return analytics; // Already initialized
+
+  const { app: initializedApp } = ensureFirebaseInitialized(); // Ensure app and auth are ready
+
+  if (!initializedApp) { // Check if app initialization was successful via the return
+    console.warn("[Firebase Analytics] Firebase app not available for Analytics initialization.");
+    return undefined;
   }
 
-  if (app) { // Ensure Firebase app is initialized
-    try {
-      analytics = getAnalytics(app);
-      console.log("[Firebase] Analytics lazily initialized.");
-    } catch (error) {
-      console.error("[Firebase] Error lazy-initializing Analytics:", error);
-      // analytics remains undefined
-    }
-  } else {
-    console.warn("[Firebase] Firebase app not initialized when trying to init Analytics.");
+  if (analytics) {
+    // console.log("[Firebase Analytics] Already initialized.");
+    return analytics;
+  }
+
+  try {
+    // Pass the initializedApp explicitly, not the module-level 'app' which might be stale
+    analytics = getAnalytics(initializedApp); 
+    console.log("[Firebase Analytics] Analytics lazily initialized.");
+  } catch (error) {
+    console.error("[Firebase Analytics] Error lazy-initializing Analytics:", error);
+    // analytics remains undefined
   }
   return analytics;
 }
 
-export { app, auth }; // Export app, auth. Analytics is exported directly due to 'export let analytics'.
-
+// Export them, they will be undefined until ensureFirebaseInitialized is called
+export { app, auth, analytics };
