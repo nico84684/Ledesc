@@ -54,6 +54,19 @@ body {
     --sidebar-accent-foreground: 195 20% 98%;
     --sidebar-border: 196 27% 85%;
     --sidebar-ring: 202 39% 32%;
+
+    /* Indicator Card Colors - Light Mode */
+    --indicator-spent-bg-light: 35 92% 95%; /* amber-50 */
+    --indicator-spent-text-light: 35 85% 45%; /* amber-600 */
+    --indicator-spent-border-light: 35 85% 45%; /* amber-600 */
+
+    --indicator-remaining-bg-light: 205 90% 95%; /* sky-50 */
+    --indicator-remaining-text-light: 205 85% 45%; /* sky-600 */
+    --indicator-remaining-border-light: 205 85% 45%; /* sky-600 */
+
+    --indicator-total-bg-light: 145 80% 95%; /* emerald-50 */
+    --indicator-total-text-light: 145 75% 38%; /* emerald-600 */
+    --indicator-total-border-light: 145 75% 38%; /* emerald-600 */
   }
 
   .dark {
@@ -99,6 +112,19 @@ body {
     --sidebar-accent-foreground: 202 39% 10%;
     --sidebar-border: 202 39% 20%;
     --sidebar-ring: 196 27% 65%;
+
+    /* Indicator Card Colors - Dark Mode (User Specified) */
+    --indicator-spent-bg-dark: 26 81% 26%; /* #78350F */
+    --indicator-spent-text-dark: 50 96% 76%; /* #FDE68A */
+    --indicator-spent-border-dark: 50 96% 76%; /* #FDE68A */
+
+    --indicator-remaining-bg-dark: 203 79% 24%; /* #0C4A6E */
+    --indicator-remaining-text-dark: 203 93% 86%; /* #BAE6FD */
+    --indicator-remaining-border-dark: 203 93% 86%; /* #BAE6FD */
+
+    --indicator-total-bg-dark: 145 60% 20%; /* #14532D */
+    --indicator-total-text-dark: 145 81% 85%; /* #BBF7D0 */
+    --indicator-total-border-dark: 145 81% 85%; /* #BBF7D0 */
   }
 }
 

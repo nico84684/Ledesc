@@ -8,8 +8,9 @@ import { Progress } from '@/components/ui/progress';
 import { DollarSign, PieChart, TrendingUp, CalendarClock } from 'lucide-react';
 import { format, parseISO, isSameMonth, getDaysInMonth, getDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useIsMobile } from '@/hooks/use-mobile'; // Corrected import
+import { useIsMobile } from '@/hooks/use-mobile';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { cn } from '@/lib/utils';
 
 interface ClientCalculatedData {
   formattedMonthYear: string;
@@ -27,9 +28,8 @@ export function BenefitUsageSummary() {
   const [clientData, setClientData] = useState<ClientCalculatedData | null>(null);
 
   useEffect(() => {
-    // Solo calcular si el store de la app está inicializado y tenemos settings
     if (!isAppStoreInitialized || !settings) {
-      setClientData(null); // Asegurarse de mostrar carga si el store no está listo
+      setClientData(null); 
       return;
     }
 
@@ -85,28 +85,52 @@ export function BenefitUsageSummary() {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="flex flex-col items-start p-4 border border-primary rounded-lg shadow-sm bg-primary/10 dark:bg-primary/15">
+          <div 
+            className={cn(
+              "flex flex-col items-start p-4 border rounded-lg shadow-sm",
+              "bg-[hsl(var(--indicator-spent-bg-light))] dark:bg-[hsl(var(--indicator-spent-bg-dark))]",
+              "border-[hsl(var(--indicator-spent-border-light))] dark:border-[hsl(var(--indicator-spent-border-dark))]"
+            )}
+          >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Gastado este Mes</span>
-              <DollarSign className="h-5 w-5 text-primary" />
+              <DollarSign className={cn("h-5 w-5", "text-[hsl(var(--indicator-spent-text-light))] dark:text-[hsl(var(--indicator-spent-text-dark))]")} />
             </div>
-            <p className="text-2xl font-bold text-primary">{formatCurrency(clientData.totalSpentThisMonth)}</p>
+            <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-spent-text-light))] dark:text-[hsl(var(--indicator-spent-text-dark))]")}>
+              {formatCurrency(clientData.totalSpentThisMonth)}
+            </p>
           </div>
 
-          <div className="flex flex-col items-start p-4 border border-accent rounded-lg shadow-sm bg-accent/10 dark:bg-accent/15">
+          <div 
+            className={cn(
+              "flex flex-col items-start p-4 border rounded-lg shadow-sm",
+              "bg-[hsl(var(--indicator-remaining-bg-light))] dark:bg-[hsl(var(--indicator-remaining-bg-dark))]",
+              "border-[hsl(var(--indicator-remaining-border-light))] dark:border-[hsl(var(--indicator-remaining-border-dark))]"
+            )}
+          >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Saldo Restante</span>
-              <PieChart className="h-5 w-5 text-accent" />
+              <PieChart className={cn("h-5 w-5", "text-[hsl(var(--indicator-remaining-text-light))] dark:text-[hsl(var(--indicator-remaining-text-dark))]")} />
             </div>
-            <p className="text-2xl font-bold text-accent">{formatCurrency(clientData.remainingBalance)}</p>
+            <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-remaining-text-light))] dark:text-[hsl(var(--indicator-remaining-text-dark))]")}>
+              {formatCurrency(clientData.remainingBalance)}
+            </p>
           </div>
           
-          <div className="flex flex-col items-start p-4 border border-green-500 rounded-lg shadow-sm bg-green-500/10 dark:bg-green-700/15">
+          <div 
+            className={cn(
+              "flex flex-col items-start p-4 border rounded-lg shadow-sm",
+              "bg-[hsl(var(--indicator-total-bg-light))] dark:bg-[hsl(var(--indicator-total-bg-dark))]",
+              "border-[hsl(var(--indicator-total-border-light))] dark:border-[hsl(var(--indicator-total-border-dark))]"
+            )}
+          >
             <div className="flex items-center justify-between w-full mb-1">
               <span className="text-sm font-medium text-muted-foreground">Beneficio Total</span>
-              <TrendingUp className="h-5 w-5 text-green-500" />
+              <TrendingUp className={cn("h-5 w-5", "text-[hsl(var(--indicator-total-text-light))] dark:text-[hsl(var(--indicator-total-text-dark))]")} />
             </div>
-            <p className="text-2xl font-bold text-green-500 dark:text-green-400">{formatCurrency(settings.monthlyAllowance)}</p>
+            <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-total-text-light))] dark:text-[hsl(var(--indicator-total-text-dark))]")}>
+              {formatCurrency(settings.monthlyAllowance)}
+            </p>
           </div>
         </div>
 
@@ -131,4 +155,3 @@ export function BenefitUsageSummary() {
     </Card>
   );
 }
-
