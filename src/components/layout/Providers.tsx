@@ -88,7 +88,7 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
+      defaultTheme="light" // Cambiado de "system" a "light"
       enableSystem
       disableTransitionOnChange
     >
