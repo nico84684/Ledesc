@@ -127,7 +127,7 @@ export function TransactionHistoryTable() {
   }
 
   const cellPadding = "px-1 py-2 sm:px-2 sm:py-3";
-  const headPadding = "px-1 py-2 sm:px-2 sm:py-3 h-auto md:h-10"; // Ajuste de altura para md
+  const headPadding = "px-1 py-2 sm:px-2 sm:py-3 h-auto md:h-10";
 
   return (
     <TooltipProvider>
@@ -205,15 +205,15 @@ export function TransactionHistoryTable() {
             </TableCaption>
             <TableHeader>
               <TableRow className="text-xs sm:text-sm">
-                <TableHead className={cn("min-w-[80px] w-[90px]", headPadding)}>
+                <TableHead className={cn("min-w-[65px] w-[75px]", headPadding)}>
                   <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left">
-                    <CalendarDays className="h-4 w-4 md:mr-1" />
+                    <CalendarDays className="h-4 w-4 md:mr-1 mb-0.5 md:mb-0" />
                     <span>Fecha</span>
                   </div>
                 </TableHead>
                 <TableHead className={headPadding}>
                   <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left">
-                    <Store className="h-4 w-4 md:mr-1" />
+                    <Store className="h-4 w-4 md:mr-1 mb-0.5 md:mb-0" />
                     <span>Comercio</span>
                   </div>
                 </TableHead>
@@ -242,7 +242,7 @@ export function TransactionHistoryTable() {
                   <TableCell className={cn("font-medium", cellPadding)}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="truncate block max-w-[50px] xs:max-w-[70px] sm:max-w-[150px] cursor-default">
+                        <span className="truncate block max-w-[40px] xs:max-w-[60px] sm:max-w-[150px] cursor-default">
                           {purchase.merchantName}
                         </span>
                       </TooltipTrigger>
