@@ -8,10 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Trash2, Eye } from 'lucide-react'; // Eye icon for details
+import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Trash2, Eye } from 'lucide-react'; 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-// Image import removed as receipt image is now in details dialog
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog';
-import { TransactionDetailsDialog } from './TransactionDetailsDialog'; // Import new Details Dialog
+import { TransactionDetailsDialog } from './TransactionDetailsDialog'; 
 import { deletePurchaseAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -60,7 +60,6 @@ export function TransactionHistoryTable() {
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [purchases]);
 
-  // uniqueMerchants removed as it's not directly used for filtering in this simplified version, merchant search is text based
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
@@ -133,7 +132,7 @@ export function TransactionHistoryTable() {
   return (
     <TooltipProvider>
     <div className="space-y-6">
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 border rounded-lg shadow-sm bg-card">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 p-2 sm:p-4 border rounded-lg shadow-sm bg-card">
         <div>
           <Label htmlFor="filter-month" className="text-sm font-medium">Mes</Label>
           <Select
@@ -206,11 +205,20 @@ export function TransactionHistoryTable() {
             </TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead className={cn("w-[100px] min-w-[90px]", headPadding)}><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
+                <TableHead className={cn("min-w-[90px]", headPadding)}><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
                 <TableHead className={headPadding}><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
-                <TableHead className={cn("text-right", headPadding)}>Monto Original</TableHead>
-                <TableHead className={cn("text-right", headPadding)}>Descuento</TableHead>
-                <TableHead className={cn("text-right", headPadding)}>Monto Final</TableHead>
+                <TableHead className={cn("text-right", headPadding)}>
+                  <span className="hidden sm:inline">Monto Original</span>
+                  <span className="sm:hidden">Original</span>
+                </TableHead>
+                <TableHead className={cn("text-right", headPadding)}>
+                  <span className="hidden sm:inline">Descuento</span>
+                  <span className="sm:hidden">Desc.</span>
+                </TableHead>
+                <TableHead className={cn("text-right font-semibold", headPadding)}>
+                   <span className="hidden sm:inline">Monto Final</span>
+                   <span className="sm:hidden">Final</span>
+                </TableHead>
                 <TableHead className={cn("text-center w-[120px]", headPadding)}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -224,7 +232,7 @@ export function TransactionHistoryTable() {
                   <TableCell className={cn("font-medium", cellPadding)}>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <span className="truncate block max-w-[100px] sm:max-w-[150px] cursor-default">
+                        <span className="truncate block max-w-[60px] xs:max-w-[80px] sm:max-w-[150px] cursor-default">
                           {purchase.merchantName}
                         </span>
                       </TooltipTrigger>
@@ -234,9 +242,9 @@ export function TransactionHistoryTable() {
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell className={cn("text-right", cellPadding)}>{formatCurrency(purchase.amount)}</TableCell>
-                  <TableCell className={cn("text-right text-green-600 dark:text-green-400", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
-                  <TableCell className={cn("text-right font-semibold", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
+                  <TableCell className={cn("text-right whitespace-nowrap", cellPadding)}>{formatCurrency(purchase.amount)}</TableCell>
+                  <TableCell className={cn("text-right text-green-600 dark:text-green-400 whitespace-nowrap", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
+                  <TableCell className={cn("text-right font-semibold whitespace-nowrap", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
                   <TableCell className={cn("text-center", cellPadding)}>
                     <div className="flex items-center justify-center space-x-0.5">
                        <Tooltip>
