@@ -90,7 +90,7 @@ export function BenefitUsageSummary() {
               <span className="text-sm font-medium text-muted-foreground">Gastado este Mes</span>
               <DollarSign className="h-5 w-5 text-primary" />
             </div>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(clientData.totalSpentThisMonth)}</p>
+            <p className="text-2xl font-bold text-primary">{formatCurrency(clientData.totalSpentThisMonth)}</p>
           </div>
 
           <div className="flex flex-col items-start p-4 border border-accent rounded-lg bg-card shadow-sm">
@@ -98,7 +98,7 @@ export function BenefitUsageSummary() {
               <span className="text-sm font-medium text-muted-foreground">Saldo Restante</span>
               <PieChart className="h-5 w-5 text-accent" />
             </div>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(clientData.remainingBalance)}</p>
+            <p className="text-2xl font-bold text-accent">{formatCurrency(clientData.remainingBalance)}</p>
           </div>
           
           <div className="flex flex-col items-start p-4 border border-green-500 rounded-lg bg-card shadow-sm">
@@ -106,7 +106,7 @@ export function BenefitUsageSummary() {
               <span className="text-sm font-medium text-muted-foreground">Beneficio Total</span>
               <TrendingUp className="h-5 w-5 text-green-500" />
             </div>
-            <p className="text-2xl font-bold text-foreground">{formatCurrency(settings.monthlyAllowance)}</p>
+            <p className="text-2xl font-bold text-green-500 dark:text-green-400">{formatCurrency(settings.monthlyAllowance)}</p>
           </div>
         </div>
 
@@ -131,4 +131,3 @@ export function BenefitUsageSummary() {
     </Card>
   );
 }
-
