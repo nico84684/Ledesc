@@ -15,10 +15,12 @@ export interface BenefitSettings {
   monthlyAllowance: number;
   discountPercentage: number; // e.g., 15 for 15%
   alertThresholdPercentage: number; // e.g., 80 for 80%
-  autoBackupToDrive: boolean; 
-  lastBackupTimestamp?: number; // Milliseconds since epoch
+  autoBackupToDrive: boolean;
+  lastBackupTimestamp?: number; // Milliseconds since epoch for Drive/Excel backup
   enableEndOfMonthReminder: boolean; // Nuevo: Habilitar recordatorio de fin de mes
   daysBeforeEndOfMonthToRemind: number; // Nuevo: Días antes para recordar
+  lastLocalSaveTimestamp?: number; // Milliseconds since epoch for local storage save
+  lastEndOfMonthReminderShownForMonth?: string; // Mover aquí para que sea parte del objeto settings
 }
 
 export interface Merchant {
@@ -31,5 +33,5 @@ export interface AppState {
   purchases: Purchase[];
   settings: BenefitSettings;
   merchants: Merchant[];
-  lastEndOfMonthReminderShownForMonth?: string; // Nuevo: Para rastrear YYYY-MM del último recordatorio
+  // lastEndOfMonthReminderShownForMonth se mueve a BenefitSettings
 }

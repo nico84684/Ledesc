@@ -4,18 +4,18 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SettingsFormSchema, type SettingsFormData } from '@/lib/schemas';
-import { updateSettingsAction, triggerGoogleDriveBackupAction, triggerGoogleDriveRestoreAction } from '@/lib/actions';
+import { triggerGoogleDriveBackupAction, triggerGoogleDriveRestoreAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw, CalendarClock } from 'lucide-react';
+import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw, CalendarClock, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
@@ -26,7 +26,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger, // Added AlertDialogTrigger
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -43,19 +43,21 @@ interface CountersState {
 }
 
 export function SettingsForm() {
-  const { settings, purchases, merchants } = useAppState(); 
-  const { 
-    isInitialized, 
-    backupToExcel, 
+  const { settings, purchases, merchants } = useAppState();
+  const {
+    isInitialized: isAppStoreInitialized,
+    backupToExcel,
     restoreFromExcel: restoreFromExcelStore,
-    updateSettings: updateSettingsInStore, 
+    updateSettings: updateSettingsInStoreAndPotentiallyFirestore,
+    restoreFromDrive: restoreFromDriveInStore,
   } = useAppDispatch();
-  const { user, accessToken, loading: authLoading, isFirebaseAuthReady } = useAuth();
+  const { user, accessToken, loading: authLoading, isFirebaseAuthReady, signIn } = useAuth(); // Added signIn
   const { toast } = useToast();
   const router = useRouter();
-  
+  const pathname = usePathname(); // Get current pathname
+
   const [isSubmittingSettings, setIsSubmittingSettings] = useState(false);
-  const [isInitialSetup, setIsInitialSetup] = useState(false); 
+  const [isInitialSetupScreen, setIsInitialSetupScreen] = useState(false);
   const [isBackingUpToDrive, setIsBackingUpToDrive] = useState(false);
   const [isRestoringFromDrive, setIsRestoringFromDrive] = useState(false);
   const [isRestoringFromExcel, setIsRestoringFromExcel] = useState(false);
@@ -68,104 +70,83 @@ export function SettingsForm() {
 
   const form = useForm<SettingsFormData>({
     resolver: zodResolver(SettingsFormSchema),
-    defaultValues: settings || DEFAULT_BENEFIT_SETTINGS, 
+    defaultValues: settings || DEFAULT_BENEFIT_SETTINGS,
   });
 
   const watchEnableEndOfMonthReminder = form.watch("enableEndOfMonthReminder");
   const watchAutoBackupToDrive = form.watch("autoBackupToDrive");
 
-
   useEffect(() => {
-    if (isInitialized && settings) { 
-      console.log("[SettingsForm Effect] Settings loaded, resetting form:", settings);
-      form.reset({
-        ...DEFAULT_BENEFIT_SETTINGS, 
-        ...settings,
-      });
-
+    if (isAppStoreInitialized && settings) {
+      form.reset({ ...DEFAULT_BENEFIT_SETTINGS, ...settings });
       if (typeof window !== 'undefined') {
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
-        if (!setupComplete && (settings.monthlyAllowance === DEFAULT_BENEFIT_SETTINGS.monthlyAllowance)) { 
-          setIsInitialSetup(true);
-           if (router.pathname !== '/settings') router.push('/settings');
-        } else if (setupComplete) {
-           setIsInitialSetup(false);
+        const stillDefaultSettings = settings.monthlyAllowance === DEFAULT_BENEFIT_SETTINGS.monthlyAllowance &&
+                                   settings.discountPercentage === DEFAULT_BENEFIT_SETTINGS.discountPercentage;
+        
+        if (!setupComplete && stillDefaultSettings) {
+          setIsInitialSetupScreen(true);
+          if (pathname !== '/settings') router.push('/settings');
+        } else {
+          setIsInitialSetupScreen(false);
         }
       }
-    } else if (isInitialized && !settings && !user) {
-        form.reset(DEFAULT_BENEFIT_SETTINGS);
-        if (typeof window !== 'undefined') {
-            const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
-            if (!setupComplete && router.pathname !== '/settings') router.push('/settings');
-        }
     }
-  }, [isInitialized, settings, form, user, router]);
+  }, [isAppStoreInitialized, settings, form, router, pathname]);
 
 
   useEffect(() => {
-    if (isInitialized && settings && settings.lastBackupTimestamp && settings.lastBackupTimestamp > 0) {
-      const newPurchases = purchases.filter(p => parseISO(p.date).getTime() > (settings.lastBackupTimestamp || 0));
-      const newMerchantsSet = new Set<string>();
-      
-      const existingMerchantIdsInOldPurchases = new Set<string>();
-      purchases.forEach(p => {
-        if(parseISO(p.date).getTime() <= (settings.lastBackupTimestamp || 0)) {
-            const merchantKey = `${p.merchantName}-${p.merchantLocation || ''}`;
-            existingMerchantIdsInOldPurchases.add(merchantKey);
+    if (isAppStoreInitialized && settings) {
+        const backupTimestamp = user ? settings.lastBackupTimestamp : settings.lastLocalSaveTimestamp;
+        const source = user ? "Firestore/Drive" : "Local";
+        
+        if (backupTimestamp && backupTimestamp > 0) {
+            const newPurchases = purchases.filter(p => parseISO(p.date).getTime() > backupTimestamp);
+            const oldPurchaseMerchantKeys = new Set<string>();
+            purchases.forEach(p => { if(parseISO(p.date).getTime() <= backupTimestamp) oldPurchaseMerchantKeys.add(`${p.merchantName}-${p.merchantLocation || ''}`); });
+            const newOrUpdatedMerchants = new Set<string>();
+            purchases.forEach(p => { if(parseISO(p.date).getTime() > backupTimestamp) newOrUpdatedMerchants.add(`${p.merchantName}-${p.merchantLocation || ''}`); });
+            merchants.forEach(m => { if(!oldPurchaseMerchantKeys.has(`${m.name}-${m.location || ''}`)) newOrUpdatedMerchants.add(`${m.name}-${m.location || ''}`); });
+            setCounters({ newPurchasesCount: newPurchases.length, newMerchantsCount: newOrUpdatedMerchants.size });
+        } else {
+             setCounters({ newPurchasesCount: purchases.length, newMerchantsCount: merchants.length });
         }
-      });
-
-      purchases.forEach(p => {
-        if (parseISO(p.date).getTime() > (settings.lastBackupTimestamp || 0)) {
-            newMerchantsSet.add(`${p.merchantName}-${p.merchantLocation || ''}`);
-        }
-      });
-      merchants.forEach(m => {
-         const merchantKey = `${m.name}-${m.location || ''}`;
-         if (!existingMerchantIdsInOldPurchases.has(merchantKey)) {
-             newMerchantsSet.add(merchantKey);
-         }
-      });
-
-
-      setCounters({
-        newPurchasesCount: newPurchases.length,
-        newMerchantsCount: newMerchantsSet.size,
-      });
-
-    } else if (isInitialized) { 
-      setCounters({
-        newPurchasesCount: purchases.length,
-        newMerchantsCount: merchants.length,
-      });
     }
-  }, [isInitialized, settings, purchases, merchants]);
+  }, [isAppStoreInitialized, settings, purchases, merchants, user]);
+
 
   async function onSubmitSettings(data: SettingsFormData) {
-    if (!user || !user.uid) {
-        toast({ title: "Error", description: "Debes iniciar sesión para guardar la configuración.", variant: "destructive"});
-        return;
-    }
     setIsSubmittingSettings(true);
-    let wasInitialSetupPending = false;
-    if (typeof window !== 'undefined') {
-      wasInitialSetupPending = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) !== 'true';
-    }
+    let wasInitialSetupScreenBeforeSave = isInitialSetupScreen; // Capture state before save
 
     try {
-      const result = await updateSettingsAction(user.uid, data); 
-      
-      if (result.success && result.settings) {
-        if (wasInitialSetupPending && typeof window !== 'undefined') {
-          localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
-          setIsInitialSetup(false); 
-          toast({
-            title: "¡Configuración Guardada!",
-            description: "Tu beneficio ha sido configurado. Serás redirigido al dashboard.",
-          });
-          router.push('/');
+      const result = await updateSettingsInStoreAndPotentiallyFirestore(data);
+
+      if (result.success) {
+        if (typeof window !== 'undefined') localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
+        setIsInitialSetupScreen(false); // Consistently turn off initial setup screen after successful save
+
+        if (!user) {
+            toast({
+                title: "Configuración Guardada Localmente",
+                description: (
+                    <div>
+                        <p>Tus configuraciones se han guardado en este navegador.</p>
+                        <p className="mt-2">
+                            <Info className="inline-block h-4 w-4 mr-1 align-text-bottom text-primary" />
+                            Para sincronizar tus datos entre dispositivos y habilitar backups en la nube, puedes {" "}
+                            <Button variant="link" className="p-0 h-auto ml-0 inline text-primary hover:underline" onClick={signIn}>
+                                iniciar sesión con Google.
+                            </Button>
+                        </p>
+                    </div>
+                ),
+                duration: 15000, // Longer duration for this important message
+            });
+            if (wasInitialSetupScreenBeforeSave) router.push('/');
         } else {
-          toast({ title: "Éxito", description: "Configuración principal guardada exitosamente." });
+            toast({ title: "Éxito", description: result.message || "Configuración guardada exitosamente." });
+            if (wasInitialSetupScreenBeforeSave) router.push('/');
         }
       } else {
         toast({ title: "Error", description: result.message || "No se pudo actualizar la configuración.", variant: 'destructive' });
@@ -177,375 +158,130 @@ export function SettingsForm() {
     }
   }
 
-  const handleExcelBackup = () => {
-    if (!user) {
-        toast({ title: "Error", description: "Debes iniciar sesión para realizar un backup.", variant: "destructive"});
-        return;
-    }
-    backupToExcel(); 
-  };
+  const handleExcelBackup = () => { backupToExcel(); };
 
   const handleExcelRestoreFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user) {
-        toast({ title: "Error", description: "Debes iniciar sesión para restaurar desde Excel.", variant: "destructive"});
-        return;
-    }
     const file = event.target.files?.[0];
     if (file) {
       setIsRestoringFromExcel(true);
-      try {
-        restoreFromExcelStore(file); 
-      } catch (error: any) {
-         toast({ title: "Error de Restauración", description: error.message || "Ocurrió un error inesperado.", variant: 'destructive' });
-      } finally {
-        setIsRestoringFromExcel(false);
-         if(fileInputRef.current) {
-           fileInputRef.current.value = "";
-         }
-      }
-    }
+      try { restoreFromExcelStore(file); }
+      catch (error: any) { toast({ title: "Error de Restauración", description: error.message || "Error inesperado.", variant: 'destructive' }); }
+      finally { setIsRestoringFromExcel(false); if(fileInputRef.current) fileInputRef.current.value = ""; }
+    } else { toast({ title: "Información", description: "No se seleccionó ningún archivo."}); }
   };
 
   const handleGoogleDriveBackup = async () => {
-    if (!user || !user.uid || !user.email || !accessToken) {
-      toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google y permitir acceso a Drive.", variant: "destructive" });
-      return;
-    }
+    if (!user || !user.uid || !user.email || !accessToken) { toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google.", variant: "destructive" }); return; }
     setIsBackingUpToDrive(true);
     try {
       const result = await triggerGoogleDriveBackupAction(user.uid, user.email, JSON.stringify(purchases), JSON.stringify(merchants), JSON.stringify(settings), accessToken);
-      if (result.success) {
-        toast({ title: "Backup a Drive Exitoso", description: result.message });
-      } else {
-        toast({ title: "Error de Backup a Drive", description: result.message, variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Error de Backup a Drive", description: error.message || "Ocurrió un error inesperado.", variant: "destructive" });
-    } finally {
-      setIsBackingUpToDrive(false);
-    }
+      if (result.success) toast({ title: "Backup a Drive Exitoso", description: result.message });
+      else toast({ title: "Error de Backup a Drive", description: result.message, variant: "destructive" });
+    } catch (error: any) { toast({ title: "Error de Backup a Drive", description: error.message || "Error inesperado.", variant: "destructive" });
+    } finally { setIsBackingUpToDrive(false); }
   };
 
   const handleGoogleDriveRestore = async () => {
-    if (!user || !user.uid || !user.email || !accessToken) {
-       toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google y permitir acceso a Drive.", variant: "destructive" });
-      return;
-    }
+    if (!user || !user.uid || !user.email || !accessToken) { toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google.", variant: "destructive" }); return; }
     setIsRestoringFromDrive(true);
     try {
       const result = await triggerGoogleDriveRestoreAction(user.uid, user.email, accessToken);
       if (result.success) {
+        restoreFromDriveInStore(result.purchasesData, result.merchantsData, result.settingsData);
         toast({ title: "Restauración desde Drive Exitosa", description: result.message });
-      } else {
-        toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o ocurrió un error.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Error de Restauración desde Drive", description: error.message || "Ocurrió un error inesperado.", variant: "destructive" });
-    } finally {
-      setIsRestoringFromDrive(false);
-    }
+      } else { toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o error.", variant: "destructive" }); }
+    } catch (error: any) { toast({ title: "Error de Restauración desde Drive", description: error.message || "Error inesperado.", variant: "destructive" });
+    } finally { setIsRestoringFromDrive(false); }
   };
 
   const handleSwitchChange = async (field: keyof Pick<BenefitSettings, "enableEndOfMonthReminder" | "autoBackupToDrive">, checked: boolean) => {
-    if (!user || !user.uid) {
-        toast({ title: "Error", description: "Debes iniciar sesión para cambiar esta configuración.", variant: "destructive" });
-        form.setValue(field, !checked); 
-        return;
-    }
-    
     form.setValue(field, checked, { shouldDirty: true, shouldValidate: true });
-    
     const currentFormValues = form.getValues();
-    const settingsPayload: SettingsFormData = {
-        ...settings, 
-        ...currentFormValues, 
-        [field]: checked, 
-    };
-
-    try {
-        const result = await updateSettingsAction(user.uid, settingsPayload);
-        if (result.success) {
-            let message = "";
-            if (field === "enableEndOfMonthReminder") message = `Recordatorio de fin de mes ${checked ? 'activado' : 'desactivado'}.`;
-            if (field === "autoBackupToDrive") message = `Backup automático a Google Drive ${checked ? 'activado' : 'desactivado'}.`;
-            toast({ title: "Configuración Actualizada", description: message });
-        } else {
-            toast({ title: "Error", description: result.message || "No se pudo actualizar la configuración.", variant: "destructive" });
-            form.setValue(field, !checked); 
-        }
-    } catch (error) {
-        toast({ title: "Error Inesperado", description: "Ocurrió un error al actualizar la configuración.", variant: "destructive" });
-        form.setValue(field, !checked); 
+    const settingsPayload: SettingsFormData = { ...settings, ...currentFormValues, [field]: checked };
+    const result = await updateSettingsInStoreAndPotentiallyFirestore(settingsPayload);
+    if (result.success) {
+        let message = field === "enableEndOfMonthReminder" ? `Recordatorio fin de mes ${checked ? 'activado' : 'desactivado'}.` : `Backup automático a Drive ${checked ? 'activado' : 'desactivado'}.`;
+        toast({ title: "Configuración Actualizada", description: message });
+    } else {
+        toast({ title: "Error", description: result.message || "No se pudo actualizar.", variant: "destructive" });
+        form.setValue(field, !checked); // Revert
     }
   };
 
-
-  if (!isInitialized || authLoading && !isFirebaseAuthReady) { 
-     return (
-      <div className="flex justify-center items-center h-64">
-        <LoadingSpinner size={48} />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando configuración...</p>
-      </div>
-    );
+  if (!isAppStoreInitialized || (authLoading && !isFirebaseAuthReady && !user)) {
+     return ( <div className="flex justify-center items-center h-64"> <LoadingSpinner size={48} /> <p className="ml-4 text-lg text-muted-foreground">Cargando...</p> </div> );
   }
-  
-  const lastBackupDisplay = settings?.lastBackupTimestamp && settings.lastBackupTimestamp > 0
-    ? `Último backup (Excel/Drive): ${format(new Date(settings.lastBackupTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
-    : "Nunca se ha realizado un backup.";
+
+  const lastBackupSource = user ? "Nube (Drive/Excel)" : "Local (Excel)";
+  const backupTimestampToDisplay = user ? settings?.lastBackupTimestamp : settings?.lastLocalSaveTimestamp;
+  const lastBackupDisplay = backupTimestampToDisplay && backupTimestampToDisplay > 0
+    ? `Último backup (${lastBackupSource}): ${format(new Date(backupTimestampToDisplay), "dd MMM yyyy, HH:mm", { locale: es })}`
+    : `Nunca se ha realizado un backup ${user ? 'en la nube' : 'local'}.`;
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8">
+    <div className="w-full max-w-2xl mx-auto space-y-8 pb-8">
+      {isInitialSetupScreen && (
+        <Card className="border-primary shadow-lg animate-in fade-in-50 duration-500">
+          <CardHeader>
+            <CardTitle className="text-xl text-primary flex items-center">
+              <Info className="h-5 w-5 mr-2" />
+              ¡Bienvenido/a a {APP_NAME}!
+            </CardTitle>
+            <CardDescription>
+              Para comenzar, revisa y guarda tu configuración inicial. Si deseas, puedes
+              <Button variant="link" className="p-0 h-auto mx-1 inline text-primary hover:underline" onClick={signIn}>
+                 iniciar sesión con Google
+              </Button>
+              para guardar tus datos en la nube y acceder desde múltiples dispositivos. De lo contrario, tus datos se guardarán solo en este navegador.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      )}
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-2xl">
-            {isInitialSetup ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
+            {isInitialSetupScreen ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
           </CardTitle>
           <CardDescription>
-            {isInitialSetup ? "Por favor, establece los parámetros iniciales de tu beneficio. Estos se guardarán en la nube." : "Ajusta los parámetros de tu beneficio gastronómico. Los cambios se guardan en la nube."}
+            {isInitialSetupScreen ? "Establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico."}
+            {!user && " Los cambios se guardarán localmente en este navegador."}
+            {user && " Los cambios se guardarán en la nube."}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmitSettings)} className="space-y-8">
               <div className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="monthlyAllowance"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Beneficio Mensual Total ($)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                      </FormControl>
-                      <FormDescription>Monto total disponible cada mes.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="discountPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Porcentaje de Descuento (%)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                      </FormControl>
-                      <FormDescription>Descuento a aplicar en cada compra.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="alertThresholdPercentage"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Umbral de Alerta de Límite (%)</FormLabel>
-                      <FormControl>
-                        <Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} />
-                      </FormControl>
-                      <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField
-                  control={form.control}
-                  name="enableEndOfMonthReminder"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base flex items-center">
-                          <CalendarClock className="mr-2 h-4 w-4" />
-                          Recordatorio de Fin de Mes
-                        </FormLabel>
-                        <FormDescription>
-                          Recibir una notificación si queda saldo pendiente cerca de fin de mes.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(checked) => handleSwitchChange("enableEndOfMonthReminder", checked)}
-                          aria-label="Activar recordatorio de fin de mes"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                {watchEnableEndOfMonthReminder && ( 
-                  <FormField
-                    control={form.control}
-                    name="daysBeforeEndOfMonthToRemind"
-                    render={({ field }) => (
-                      <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3">
-                        <FormLabel>Días antes de fin de mes para recordar</FormLabel>
-                        <FormControl>
-                          <Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} />
-                        </FormControl>
-                        <FormDescription>Se te recordará cuando falten estos días para terminar el mes, si tienes saldo. (Se guarda con el botón principal)</FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
-
-                 <FormField
-                  control={form.control}
-                  name="autoBackupToDrive"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base">Backup Automático a Google Drive</FormLabel>
-                        <FormDescription>
-                          Guardar automáticamente en Drive tras cada compra o cambio en comercios. Requiere inicio de sesión.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(checked) => handleSwitchChange("autoBackupToDrive", checked)}
-                          aria-label="Activar backup automático a Google Drive"
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <FormField control={form.control} name="monthlyAllowance" render={({ field }) => ( <FormItem> <FormLabel>Beneficio Mensual Total ($)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Monto total disponible cada mes.</FormDescription> <FormMessage /> </FormItem> )} />
+                <FormField control={form.control} name="discountPercentage" render={({ field }) => ( <FormItem> <FormLabel>Porcentaje de Descuento (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Descuento a aplicar en cada compra.</FormDescription> <FormMessage /> </FormItem> )} />
+                <FormField control={form.control} name="alertThresholdPercentage" render={({ field }) => ( <FormItem> <FormLabel>Umbral de Alerta de Límite (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription> <FormMessage /> </FormItem> )} />
+                <FormField control={form.control} name="enableEndOfMonthReminder" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"> <div className="space-y-0.5"> <FormLabel className="text-base flex items-center"><CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes</FormLabel> <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription> </div> <FormControl><Switch checked={field.value} onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)} /></FormControl> </FormItem> )} />
+                {watchEnableEndOfMonthReminder && ( <FormField control={form.control} name="daysBeforeEndOfMonthToRemind" render={({ field }) => ( <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3"> <FormLabel>Días antes para recordar</FormLabel> <FormControl><Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl><FormMessage /></FormItem> )} /> )}
+                <FormField control={form.control} name="autoBackupToDrive" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"> <div className="space-y-0.5"> <FormLabel className="text-base">Backup Automático a Google Drive</FormLabel> <FormDescription>Requiere inicio de sesión con Google.</FormDescription> </div> <FormControl><Switch checked={field.value} disabled={!user} onCheckedChange={(c) => handleSwitchChange("autoBackupToDrive", c)} /></FormControl> </FormItem> )} />
+                {!user && watchAutoBackupToDrive && ( <p className="text-xs text-orange-600 dark:text-orange-400 px-4 -mt-3"><AlertTriangle className="inline-block h-3 w-3 mr-1" />Backup automático requiere inicio de sesión.</p> )}
               </div>
-              <Button type="submit" className="w-full" disabled={isSubmittingSettings || (!user && !isInitialSetup) }>
-                {isSubmittingSettings ? (<Loader2 className="mr-2 h-4 w-4 animate-spin" />) : (<Save className="mr-2 h-4 w-4" />)}
-                {isSubmittingSettings ? 'Guardando...' : (isInitialSetup ? 'Guardar Configuración Inicial' : 'Guardar Configuración Principal')}
-              </Button>
-              {!user && !isInitialSetup && <p className="text-sm text-destructive text-center mt-2">Debes iniciar sesión para guardar cambios.</p>}
+              <Button type="submit" className="w-full" disabled={isSubmittingSettings}> {isSubmittingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isSubmittingSettings ? 'Guardando...' : (isInitialSetupScreen ? 'Guardar y Continuar' : 'Guardar Configuración')} </Button>
             </form>
           </Form>
         </CardContent>
       </Card>
-      
+
       <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-xl">Gestión de Datos (Backup y Restauración)</CardTitle>
-          <CardDescription>Realiza backups y restaura tus datos. Los datos se guardan y leen desde la nube.</CardDescription>
-        </CardHeader>
+        <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y restaura tus datos.</CardDescription> </CardHeader>
         <CardContent className="space-y-6">
-          <div className="p-3 border rounded-md bg-muted/50 text-sm">
-            <p className="mb-2 font-medium">{lastBackupDisplay}</p>
-            <div className="flex items-center">
-              <ShoppingCart className="h-4 w-4 mr-2 text-primary" /> 
-              <span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup (basado en datos actuales).</span>
-            </div>
-             {watchAutoBackupToDrive && user && (
-              <div className="flex items-center mt-2 text-green-700 dark:text-green-400">
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                <span>Backup automático a Google Drive está ACTIVO.</span>
-              </div>
-            )}
-            {watchAutoBackupToDrive && !user && (
-              <div className="flex items-center mt-2 text-orange-600 dark:text-orange-400">
-                <AlertTriangle className="h-4 w-4 mr-2" />
-                <span>Backup automático activo, pero requiere iniciar sesión con Google.</span>
-              </div>
-            )}
-          </div>
-
+          <div className="p-3 border rounded-md bg-muted/50 text-sm"> <p className="mb-2 font-medium">{lastBackupDisplay}</p> <div className="flex items-center"><ShoppingCart className="h-4 w-4 mr-2 text-primary" /><span>{counters.newPurchasesCount} compras y {counters.newMerchantsCount} comercios nuevos desde el último backup.</span></div> {watchAutoBackupToDrive && user && ( <div className="flex items-center mt-2 text-green-700 dark:text-green-400"><RefreshCw className="h-4 w-4 mr-2 animate-spin" /><span>Backup automático a Drive ACTIVO.</span></div> )} {watchAutoBackupToDrive && !user && ( <div className="flex items-center mt-2 text-orange-600 dark:text-orange-400"><AlertTriangle className="h-4 w-4 mr-2" /><span>Backup automático a Drive requiere inicio de sesión.</span></div> )} </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4 p-4 border rounded-lg shadow-sm">
-              <h4 className="font-semibold text-lg flex items-center"><UploadCloud className="mr-2 h-5 w-5 text-primary"/>Realizar Backup</h4>
-              <Separator />
-              <div className="space-y-3">
-                <Button onClick={handleExcelBackup} className="w-full" variant="outline" disabled={!user}>
-                  <FileDown className="mr-2 h-4 w-4" />
-                  A Excel (Local)
-                </Button>
-                <Button 
-                  onClick={handleGoogleDriveBackup} 
-                  className="w-full" 
-                  variant="outline"
-                  disabled={!user || isBackingUpToDrive || authLoading}
-                >
-                  {isBackingUpToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}
-                  {isBackingUpToDrive ? 'Realizando backup...' : 'A Google Drive'}
-                </Button>
-                {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión con Google para backup en Drive.</p>}
-              </div>
-            </div>
-
-            <div className="space-y-4 p-4 border rounded-lg shadow-sm">
-              <h4 className="font-semibold text-lg flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary"/>Restaurar Datos</h4>
-              <Separator />
-              <div className="space-y-3">
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button className="w-full" variant="outline" disabled={isRestoringFromExcel || !user}>
-                      {isRestoringFromExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                      {isRestoringFromExcel ? 'Restaurando...' : 'Desde Excel (Local)'}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Confirmar Restauración desde Excel</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción reemplazará todos tus datos en la nube (compras y comercios) con los datos del archivo Excel.
-                        ¿Estás seguro? Se recomienda hacer un backup primero.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => fileInputRef.current?.click()}>
-                        Continuar y Seleccionar Archivo
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <input type="file" ref={fileInputRef} onChange={handleExcelRestoreFileSelect} accept=".xlsx, .xls" className="hidden" disabled={isRestoringFromExcel}/>
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                     <Button 
-                        className="w-full" 
-                        variant="outline"
-                        disabled={!user || isRestoringFromDrive || authLoading}
-                      >
-                        {isRestoringFromDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />}
-                        {isRestoringFromDrive ? 'Restaurando...' : 'Desde Google Drive'}
-                      </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Confirmar Restauración desde Google Drive</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Esta acción reemplazará todos tus datos en la nube (compras, comercios y configuración) con la última versión guardada en Google Drive.
-                        ¿Estás seguro? Se recomienda hacer un backup (Excel o Drive) primero si tienes cambios locales importantes.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleGoogleDriveRestore}>
-                        Continuar con la Restauración
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión con Google para restaurar desde Drive.</p>}
-              </div>
-            </div>
-          </div>
-          
+            <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><UploadCloud className="mr-2 h-5 w-5 text-primary"/>Realizar Backup</h4> <Separator /> <div className="space-y-3"> <Button onClick={handleExcelBackup} className="w-full" variant="outline"><FileDown className="mr-2 h-4 w-4" />A Excel (Local)</Button> <Button onClick={handleGoogleDriveBackup} className="w-full" variant="outline" disabled={!user || isBackingUpToDrive || authLoading}>{isBackingUpToDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{isBackingUpToDrive ? 'Realizando backup...' : 'A Google Drive'}</Button> {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión para backup en Drive.</p>} </div> </div>
+            <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><DownloadCloud className="mr-2 h-5 w-5 text-primary"/>Restaurar Datos</h4> <Separator /> <div className="space-y-3">
+                <AlertDialog> <AlertDialogTrigger asChild><Button className="w-full" variant="outline" disabled={isRestoringFromExcel}>{isRestoringFromExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}{isRestoringFromExcel ? 'Restaurando...' : 'Desde Excel (Local)'}</Button></AlertDialogTrigger>
+                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restaurar desde Excel</AlertDialogTitle><AlertDialogDescription>Esto reemplazará tus datos {user ? "en la nube" : "locales"} con los del archivo. ¿Seguro?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => fileInputRef.current?.click()}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                </AlertDialog> <input type="file" ref={fileInputRef} onChange={handleExcelRestoreFileSelect} accept=".xlsx,.xls" className="hidden" disabled={isRestoringFromExcel}/>
+                <AlertDialog> <AlertDialogTrigger asChild><Button className="w-full" variant="outline" disabled={!user || isRestoringFromDrive || authLoading}>{isRestoringFromDrive ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DownloadCloud className="mr-2 h-4 w-4" />}{isRestoringFromDrive ? 'Restaurando...' : 'Desde Google Drive'}</Button></AlertDialogTrigger>
+                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restaurar desde Google Drive</AlertDialogTitle><AlertDialogDescription>Esto reemplazará tus datos en la nube con los de Drive. ¿Seguro?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={handleGoogleDriveRestore}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                </AlertDialog> {!user && !authLoading && <p className="text-xs text-muted-foreground text-center">Inicia sesión para restaurar desde Drive.</p>}
+            </div> </div> </div>
           <Separator />
-
-          <div className="flex items-start p-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
-            <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" />
-            <div>
-              <span className="font-semibold">Nota sobre Restauración desde Excel:</span>
-              <ul className="list-disc list-inside pl-2 mt-1 space-y-0.5">
-                <li>El archivo debe contener hojas llamadas "Compras" y "Comercios".</li>
-                <li>Las columnas deben coincidir con el formato de backup (ID, Fecha, Monto Original, etc.).</li>
-                <li>Las fechas en la hoja "Compras" deben estar en formato 'AAAA-MM-DD HH:MM:SS' o ser fechas válidas de Excel.</li>
-              </ul>
-            </div>
-          </div>
+          <div className="flex items-start p-3 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-md dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700"> <AlertCircle className="h-5 w-5 mr-2 shrink-0 mt-0.5" /> <div><span className="font-semibold">Nota sobre Restauración desde Excel:</span><ul className="list-disc list-inside pl-2 mt-1 space-y-0.5"><li>Debe contener hojas "Compras" y "Comercios".</li><li>Columnas deben coincidir con formato de backup.</li><li>Fechas en "Compras" como 'AAAA-MM-DD HH:MM:SS' o válidas de Excel.</li></ul></div></div>
         </CardContent>
       </Card>
     </div>
