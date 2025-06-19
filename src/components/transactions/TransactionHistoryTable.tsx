@@ -126,8 +126,8 @@ export function TransactionHistoryTable() {
     );
   }
 
-  const cellPadding = "px-2 py-3";
-  const headPadding = "px-2 py-3 h-10";
+  const cellPadding = "px-1 py-2 sm:px-2 sm:py-3";
+  const headPadding = "px-1 py-2 sm:px-2 sm:py-3 h-10";
 
   return (
     <TooltipProvider>
@@ -204,7 +204,7 @@ export function TransactionHistoryTable() {
               Descuento aplicado: {settings.discountPercentage}%.
             </TableCaption>
             <TableHeader>
-              <TableRow>
+              <TableRow className="text-xs sm:text-sm">
                 <TableHead className={cn("min-w-[90px]", headPadding)}><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
                 <TableHead className={headPadding}><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
                 <TableHead className={cn("text-right", headPadding)}>
@@ -219,12 +219,12 @@ export function TransactionHistoryTable() {
                    <span className="hidden sm:inline">Monto Final</span>
                    <span className="sm:hidden">Final</span>
                 </TableHead>
-                <TableHead className={cn("text-center w-[120px]", headPadding)}>Acciones</TableHead>
+                <TableHead className={cn("text-center w-[100px] sm:w-[120px]", headPadding)}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedPurchases.map((purchase) => (
-                <TableRow key={purchase.id}>
+                <TableRow key={purchase.id} className="text-xs sm:text-sm">
                   <TableCell className={cellPadding}>
                     <span className="hidden sm:inline">{format(parseISO(purchase.date), 'dd MMM yy', { locale: es })}</span>
                     <span className="sm:hidden">{format(parseISO(purchase.date), 'dd/MM/yy', { locale: es })}</span>
@@ -246,10 +246,10 @@ export function TransactionHistoryTable() {
                   <TableCell className={cn("text-right text-green-600 dark:text-green-400 whitespace-nowrap", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
                   <TableCell className={cn("text-right font-semibold whitespace-nowrap", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
                   <TableCell className={cn("text-center", cellPadding)}>
-                    <div className="flex items-center justify-center space-x-0.5">
+                    <div className="flex items-center justify-center space-x-0 sm:space-x-px">
                        <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDetailsClick(purchase)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => handleDetailsClick(purchase)}>
                             <Eye className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -259,7 +259,7 @@ export function TransactionHistoryTable() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(purchase)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8" onClick={() => handleEditClick(purchase)}>
                             <Edit3 className="h-4 w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -271,7 +271,7 @@ export function TransactionHistoryTable() {
                         <AlertDialogTrigger asChild>
                            <Tooltip>
                             <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive">
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </TooltipTrigger>
