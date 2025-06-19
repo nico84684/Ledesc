@@ -1,0 +1,31 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Regla general: los usuarios solo pueden acceder a sus propios datos.
+    // {document=**} coincide con cualquier documento en cualquier subcolección bajo /users/{userId}
+    match /users/{userId}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Para ser más explícitos y como buena práctica, también definimos reglas
+    // para cada subcolección específica.
+    // Si bien la regla anterior ya las cubriría, esto añade claridad.
+
+    // Configuración del usuario (generalmente un solo documento 'main')
+    match /users/{userId}/settings/{settingsDocId} {
+      allow read, create, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Compras del usuario
+    match /users/{userId}/purchases/{purchaseId} {
+      allow read, list, create, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Comercios del usuario
+    match /users/{userId}/merchants/{merchantId} {
+      allow read, list, create, update, delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}
