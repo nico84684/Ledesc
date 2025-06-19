@@ -35,14 +35,31 @@ console.log("[Firebase] Auth initialized.");
 // to the list of "Authorized domains" in the Firebase Console:
 // Firebase Console -> Your Project -> Authentication -> Sign-in method -> Authorized domains.
 
-let analytics: Analytics | undefined;
-if (typeof window !== 'undefined') {
-  try {
-    analytics = getAnalytics(app);
-    console.log("[Firebase] Analytics initialized.");
-  } catch (error) {
-    console.warn("[Firebase] Analytics could not be initialized:", error);
+export let analytics: Analytics | undefined; // Declare analytics, but don't initialize here
+
+export function ensureAnalyticsInitialized(): Analytics | undefined {
+  if (typeof window === 'undefined') {
+    // console.log("[Firebase Analytics] Not initializing on server.");
+    return undefined;
   }
+  if (analytics) {
+    // console.log("[Firebase Analytics] Already initialized.");
+    return analytics; // Already initialized
+  }
+
+  if (app) { // Ensure Firebase app is initialized
+    try {
+      analytics = getAnalytics(app);
+      console.log("[Firebase] Analytics lazily initialized.");
+    } catch (error) {
+      console.error("[Firebase] Error lazy-initializing Analytics:", error);
+      // analytics remains undefined
+    }
+  } else {
+    console.warn("[Firebase] Firebase app not initialized when trying to init Analytics.");
+  }
+  return analytics;
 }
 
-export { app, auth, analytics }; // Export auth
+export { app, auth }; // Export app, auth. Analytics is exported directly due to 'export let analytics'.
+

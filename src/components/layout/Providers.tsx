@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { createContext, useContext, useEffect, useState, useCallback }
 from 'react';
 import { onAuthStateChanged, type User, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, ensureAnalyticsInitialized } from '@/lib/firebase'; // Import ensureAnalyticsInitialized
 import { useToast } from '@/hooks/use-toast';
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
@@ -34,6 +34,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  // Effect to initialize Firebase Analytics on client-side
+  useEffect(() => {
+    ensureAnalyticsInitialized();
   }, []);
 
   const signIn = useCallback(async () => {
