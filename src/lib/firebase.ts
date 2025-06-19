@@ -22,35 +22,32 @@ let auth: Auth | undefined;
 let analytics: Analytics | undefined;
 
 export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, auth: Auth | undefined } {
-  console.log("[Firebase Core] ensureFirebaseInitialized function called. typeof window:", typeof window);
   if (typeof window === 'undefined') {
-    console.log("[Firebase Core] Not initializing on server (ensureFirebaseInitialized).");
+    console.warn("[Firebase Core] Not initializing on server (ensureFirebaseInitialized).");
     return { app, auth };
   }
 
   if (app && auth) {
-    console.log("[Firebase Core] App and Auth already initialized (ensureFirebaseInitialized).");
+    // Already initialized
     return { app, auth };
   }
 
   try {
-    console.log("[Firebase Core] Attempting to get/initialize FirebaseApp (ensureFirebaseInitialized).");
     if (getApps().length === 0) {
+      console.log("[Firebase Core] Initializing FirebaseApp...");
       app = initializeApp(firebaseConfig);
-      console.log("[Firebase Core] FirebaseApp initialized successfully (ensureFirebaseInitialized).");
+      console.log("[Firebase Core] FirebaseApp initialized.");
     } else {
       app = getApps()[0];
-      console.log("[Firebase Core] FirebaseApp instance retrieved (ensureFirebaseInitialized).");
+      console.log("[Firebase Core] FirebaseApp instance retrieved.");
     }
 
     if (app && !auth) {
-        console.log("[Firebase Core] FirebaseApp available. Attempting getAuth(app) (ensureFirebaseInitialized).");
+        console.log("[Firebase Core] Initializing Firebase Auth...");
         auth = getAuth(app);
-        console.log("[Firebase Core] Firebase Auth initialized successfully (ensureFirebaseInitialized).");
+        console.log("[Firebase Core] Firebase Auth initialized.");
     } else if (!app) {
         console.warn("[Firebase Core] FirebaseApp is not available after initialization attempt (ensureFirebaseInitialized).");
-    } else if (auth) {
-        console.log("[Firebase Core] Firebase Auth was already available (ensureFirebaseInitialized).");
     }
   } catch (error: any) {
     console.error("[Firebase Core] Error during Firebase App/Auth initialization (ensureFirebaseInitialized):", error, error.stack);
@@ -60,13 +57,12 @@ export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, aut
 
 
 export function ensureAnalyticsInitialized(): Analytics | undefined {
-  console.log("[Firebase Analytics] ensureAnalyticsInitialized function called. typeof window:", typeof window);
   if (typeof window === 'undefined') {
-    console.log("[Firebase Analytics] Not initializing on server (ensureAnalyticsInitialized).");
+    console.warn("[Firebase Analytics] Not initializing on server (ensureAnalyticsInitialized).");
     return undefined;
   }
 
-  const { app: initializedApp } = ensureFirebaseInitialized(); // Ensure app and auth are ready first
+  const { app: initializedApp } = ensureFirebaseInitialized();
 
   if (!initializedApp) {
     console.warn("[Firebase Analytics] Firebase app not available for Analytics initialization (ensureAnalyticsInitialized).");
@@ -74,14 +70,14 @@ export function ensureAnalyticsInitialized(): Analytics | undefined {
   }
 
   if (analytics) {
-    console.log("[Firebase Analytics] Analytics already initialized (ensureAnalyticsInitialized).");
+    // Already initialized
     return analytics;
   }
 
   try {
-    console.log("[Firebase Analytics] FirebaseApp available. Attempting getAnalytics(initializedApp) (ensureAnalyticsInitialized).");
+    console.log("[Firebase Analytics] Initializing Firebase Analytics (lazily)...");
     analytics = getAnalytics(initializedApp);
-    console.log("[Firebase Analytics] Firebase Analytics initialized successfully (ensureAnalyticsInitialized).");
+    console.log("[Firebase Analytics] Firebase Analytics lazily initialized.");
   } catch (error: any) {
     console.error("[Firebase Analytics] Error during Analytics initialization (ensureAnalyticsInitialized):", error, error.stack);
   }

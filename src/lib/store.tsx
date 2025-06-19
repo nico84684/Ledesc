@@ -87,7 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           previousPurchasesRef.current = parsedState.purchases; 
           previousMerchantsRef.current = parsedState.merchants;
         } catch (error) {
-          console.error("Failed to parse state from localStorage", error);
+          console.error("[AppStore] Failed to parse state from localStorage", error);
           setState(prevState => ({
             ...prevState, 
             settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings },
@@ -152,14 +152,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (isInitialized && typeof window !== 'undefined') {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
-        const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
-        if (!setupComplete && pathname !== '/settings') {
-            if (typeof window !== 'undefined') router.push('/settings');
+    if (isInitialized) {
+      if (typeof window !== 'undefined') {
+        console.log('[AppStore Persist Effect] Attempting to save state to localStorage. Current purchases count:', state.purchases.length);
+        try {
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+          console.log('[AppStore Persist Effect] State successfully saved to localStorage.');
+        } catch (e) {
+          // Este catch es crucial si localStorage.setItem falla.
+          console.error('[AppStore Persist Effect] FAILED to save state to localStorage. This will prevent data from persisting (e.g., deletions). Error:', e);
+          // Podríamos mostrar un toast aquí, pero podría ser muy intrusivo si el error es constante.
+          // toast({ title: "Error de Almacenamiento", description: "No se pudo guardar el estado de la aplicación. Los cambios podrían no persistir.", variant: "destructive", duration: 10000 });
         }
 
-        if (isMounted.current) { 
+        // Lógica de INITIAL_SETUP_COMPLETE_KEY
+        try {
+            const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
+            if (!setupComplete && pathname !== '/settings') {
+                console.log('[AppStore Persist Effect] Initial setup not complete, redirecting to /settings.');
+                router.push('/settings');
+            }
+        } catch (e) {
+            console.error('[AppStore Persist Effect] FAILED to access INITIAL_SETUP_COMPLETE_KEY from localStorage. Error:', e);
+        }
+        
+        // Lógica de Auto-Backup
+        if (isMounted.current) {
             const purchasesActuallyChanged = JSON.stringify(state.purchases) !== JSON.stringify(previousPurchasesRef.current);
             const merchantsActuallyChanged = JSON.stringify(state.merchants) !== JSON.stringify(previousMerchantsRef.current);
 
@@ -180,8 +198,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         previousPurchasesRef.current = state.purchases;
         previousMerchantsRef.current = state.merchants;
+
+      } else {
+        console.warn('[AppStore Persist Effect] Skipping localStorage operations: window is undefined.');
+      }
     }
-  }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup]);
+  }, [state, isInitialized, router, pathname, user, accessToken, handleAutoBackup]); // Asegurar todas las dependencias
+
 
   // Effect for End of Month Reminder
   useEffect(() => {
@@ -368,17 +391,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const deletePurchase = useCallback((purchaseId: string) => {
     console.log(`[AppStore] deletePurchase called for ID: ${purchaseId}`);
     setState(prevState => {
-      const initialPurchases = prevState.purchases;
-      const updatedPurchases = initialPurchases.filter(p => p.id !== purchaseId);
+      const initialPurchasesCount = prevState.purchases.length;
+      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
 
-      if (initialPurchases.length === updatedPurchases.length) {
-        // Esto significa que la compra no se encontró o el ID no coincidió.
-        // Podría ser un indicio de un problema si se esperaba que la compra existiera.
+      if (initialPurchasesCount === updatedPurchases.length) {
         console.warn(`[AppStore] Purchase with ID: ${purchaseId} not found in state, or filter did not remove it. No state change.`);
-        return prevState; // Devuelve el estado anterior para evitar re-renders innecesarios.
+        return prevState; 
       }
       
-      console.log(`[AppStore] Purchase with ID: ${purchaseId} removed from state. Old count: ${initialPurchases.length}, New count: ${updatedPurchases.length}`);
+      console.log(`[AppStore] Purchase with ID: ${purchaseId} removed from state. Old count: ${initialPurchasesCount}, New count: ${updatedPurchases.length}`);
       return { ...prevState, purchases: updatedPurchases };
     });
   }, []);
