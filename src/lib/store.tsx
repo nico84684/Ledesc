@@ -139,26 +139,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
       firestoreUnsubscribersRef.current.forEach(unsub => unsub());
       firestoreUnsubscribersRef.current = [];
     };
-  }, [user, isFirebaseAuthReady, router, pathname]); // Removed state.settings.lastLocalSaveTimestamp to avoid potential issues
+  }, [user, isFirebaseAuthReady, router, pathname]);
 
 
   useEffect(() => {
     if (isInitialized && !user && typeof window !== 'undefined' && isMounted.current) {
       // console.log("[AppStore Persist Local] Saving state to localStorage when user is not logged in.");
       try {
-        // Prepare settings for localStorage, including the current timestamp for the save.
         const settingsForLocalStorage = { ...state.settings, lastLocalSaveTimestamp: Date.now() };
-
         localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsForLocalStorage));
         localStorage.setItem(LOCAL_STORAGE_PURCHASES_KEY, JSON.stringify(state.purchases));
         localStorage.setItem(LOCAL_STORAGE_MERCHANTS_KEY, JSON.stringify(state.merchants));
-
-        // DO NOT call setState here to update state.settings.lastLocalSaveTimestamp in memory,
-        // as state.settings is a dependency of this useEffect. Doing so would cause an infinite loop.
-        // The timestamp is correctly saved to localStorage.
-        // If settings data (e.g., monthlyAllowance) is changed by the user,
-        // `updateSettings` will update state.settings, and then this effect will persist it.
-
       } catch (error) {
         console.error("[AppStore Persist Local] FAILED to save state to localStorage:", error);
         toast({
@@ -277,7 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user && user.uid && firestoreDb) {
       // For logged-in users, server action handles Firestore write.
       // onSnapshot will update local state.
-      return serverAddPurchaseAction(user.uid, { ...purchaseData, receiptImageUrl: undefined }, state.settings);
+      return serverAddPurchaseAction(user.uid, purchaseData, state.settings);
     } else {
       // For non-logged-in users, update local state.
       const newPurchase: Purchase = { id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, ...newPurchaseCoreData };
@@ -306,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     if (user && user.uid && firestoreDb) {
-      return serverEditPurchaseAction(user.uid, purchaseId, { ...purchaseData, receiptImageUrl: undefined }, state.settings);
+      return serverEditPurchaseAction(user.uid, purchaseId, purchaseData, state.settings);
     } else {
       setState(prevState => {
         const updatedPurchases = prevState.purchases.map(p => p.id === purchaseId ? { ...p, ...updatedPurchaseCoreData } : p).sort((a,b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
@@ -510,3 +501,4 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
