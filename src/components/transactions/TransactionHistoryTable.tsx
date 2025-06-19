@@ -8,18 +8,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Receipt, MessageSquareText, Edit3, Trash2 } from 'lucide-react';
+import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Trash2, Eye } from 'lucide-react'; // Eye icon for details
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import Image from 'next/image';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogDescription,
-} from "@/components/ui/dialog";
+// Image import removed as receipt image is now in details dialog
 import {
   AlertDialog,
   AlertDialogAction,
@@ -34,7 +26,8 @@ import {
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog'; // Import EditPurchaseDialog
+import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog';
+import { TransactionDetailsDialog } from './TransactionDetailsDialog'; // Import new Details Dialog
 import { deletePurchaseAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -54,6 +47,10 @@ export function TransactionHistoryTable() {
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedPurchaseForEdit, setSelectedPurchaseForEdit] = useState<Purchase | null>(null);
+  
+  const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
+  const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState<Purchase | null>(null);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
 
@@ -63,11 +60,7 @@ export function TransactionHistoryTable() {
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [purchases]);
 
-  const uniqueMerchants = useMemo(() => {
-    const merchants = new Set<string>();
-    purchases.forEach(p => merchants.add(p.merchantName));
-    return Array.from(merchants).sort();
-  }, [purchases]);
+  // uniqueMerchants removed as it's not directly used for filtering in this simplified version, merchant search is text based
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
@@ -76,7 +69,7 @@ export function TransactionHistoryTable() {
       const matchesMerchant = filterMerchant ? p.merchantName.toLowerCase().includes(filterMerchant.toLowerCase()) : true;
       const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true;
       return matchesMonth && matchesMerchant && matchesAmount;
-    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); //Ensure consistent sort
+    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
   }, [purchases, filterMonth, filterMerchant, filterAmount]);
 
   const paginatedPurchases = useMemo(() => {
@@ -100,6 +93,11 @@ export function TransactionHistoryTable() {
   const handleEditClick = (purchase: Purchase) => {
     setSelectedPurchaseForEdit(purchase);
     setIsEditDialogOpen(true);
+  };
+  
+  const handleDetailsClick = (purchase: Purchase) => {
+    setSelectedPurchaseForDetails(purchase);
+    setIsDetailsDialogOpen(true);
   };
 
   const handleDeletePurchase = async (purchaseId: string) => {
@@ -210,12 +208,10 @@ export function TransactionHistoryTable() {
               <TableRow>
                 <TableHead className={cn("w-[100px] min-w-[90px]", headPadding)}><CalendarDays className="inline mr-1 h-4 w-4" />Fecha</TableHead>
                 <TableHead className={headPadding}><Store className="inline mr-1 h-4 w-4" />Comercio</TableHead>
-                <TableHead className={headPadding}><MessageSquareText className="inline mr-1 h-4 w-4" />Descripción</TableHead>
                 <TableHead className={cn("text-right", headPadding)}>Monto Original</TableHead>
                 <TableHead className={cn("text-right", headPadding)}>Descuento</TableHead>
                 <TableHead className={cn("text-right", headPadding)}>Monto Final</TableHead>
-                <TableHead className={cn("text-center", headPadding)}>Recibo</TableHead>
-                <TableHead className={cn("text-center", headPadding)}>Acciones</TableHead>
+                <TableHead className={cn("text-center w-[120px]", headPadding)}>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -234,52 +230,25 @@ export function TransactionHistoryTable() {
                       </TooltipTrigger>
                       <TooltipContent side="top" align="start">
                         <p className="max-w-xs whitespace-normal break-words">{purchase.merchantName}</p>
+                         {purchase.merchantLocation && <p className="text-xs text-muted-foreground">{purchase.merchantLocation}</p>}
                       </TooltipContent>
                     </Tooltip>
-                  </TableCell>
-                  <TableCell className={cellPadding}>
-                    {purchase.description ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="truncate block max-w-[120px] cursor-default">
-                            {purchase.description}
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start">
-                          <p className="max-w-xs whitespace-normal break-words">{purchase.description}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
                   </TableCell>
                   <TableCell className={cn("text-right", cellPadding)}>{formatCurrency(purchase.amount)}</TableCell>
                   <TableCell className={cn("text-right text-green-600 dark:text-green-400", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
                   <TableCell className={cn("text-right font-semibold", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
                   <TableCell className={cn("text-center", cellPadding)}>
-                    {purchase.receiptImageUrl ? (
-                       <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="sm"><Receipt className="h-4 w-4" /></Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px]">
-                          <DialogHeader>
-                            <DialogTitle>Recibo de {purchase.merchantName}</DialogTitle>
-                             <DialogDescription>
-                              Fecha: {format(parseISO(purchase.date), 'dd MMM yyyy', { locale: es })}
-                            </DialogDescription>
-                          </DialogHeader>
-                          <div className="mt-4 flex justify-center">
-                            <Image src={purchase.receiptImageUrl} alt={`Recibo de ${purchase.merchantName}`} width={300} height={400} className="rounded-md object-contain" data-ai-hint="receipt document"/>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell className={cn("text-center", cellPadding)}>
-                    <div className="flex items-center justify-center space-x-1">
+                    <div className="flex items-center justify-center space-x-0.5">
+                       <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleDetailsClick(purchase)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Ver Detalles</p>
+                        </TooltipContent>
+                      </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditClick(purchase)}>
@@ -292,9 +261,16 @@ export function TransactionHistoryTable() {
                       </Tooltip>
                       <AlertDialog>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                           <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Eliminar Compra</p>
+                            </TooltipContent>
+                          </Tooltip>
                         </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
@@ -357,6 +333,17 @@ export function TransactionHistoryTable() {
           onOpenChange={(open) => {
             setIsEditDialogOpen(open);
             if (!open) setSelectedPurchaseForEdit(null);
+          }}
+        />
+      )}
+
+      {selectedPurchaseForDetails && (
+        <TransactionDetailsDialog
+          purchase={selectedPurchaseForDetails}
+          isOpen={isDetailsDialogOpen}
+          onOpenChange={(open) => {
+            setIsDetailsDialogOpen(open);
+            if (!open) setSelectedPurchaseForDetails(null);
           }}
         />
       )}
