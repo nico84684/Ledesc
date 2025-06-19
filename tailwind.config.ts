@@ -9,6 +9,9 @@ export default {
   ],
   theme: {
   	extend: {
+      fontSize: {
+        'xxs': ['0.6875rem', { lineHeight: '0.875rem' }], // Aprox 11px
+      },
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',

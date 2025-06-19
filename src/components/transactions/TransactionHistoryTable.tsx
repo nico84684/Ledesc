@@ -204,7 +204,7 @@ export function TransactionHistoryTable() {
               Descuento aplicado: {settings.discountPercentage}%.
             </TableCaption>
             <TableHeader>
-              <TableRow className="text-xs sm:text-sm">
+              <TableRow className="text-xxs sm:text-sm">
                 <TableHead className={cn("min-w-[65px] w-[75px]", headPadding)}>
                   <div className="flex flex-col items-center text-center md:flex-row md:items-center md:text-left">
                     <CalendarDays className="h-4 w-4 md:mr-1 mb-0.5 md:mb-0" />
@@ -234,7 +234,7 @@ export function TransactionHistoryTable() {
             </TableHeader>
             <TableBody>
               {paginatedPurchases.map((purchase) => (
-                <TableRow key={purchase.id} className="text-xs sm:text-sm">
+                <TableRow key={purchase.id} className="text-xxs sm:text-sm">
                   <TableCell className={cellPadding}>
                     <span className="hidden sm:inline">{format(parseISO(purchase.date), 'dd MMM yy', { locale: es })}</span>
                     <span className="sm:hidden">{format(parseISO(purchase.date), 'dd/MM/yy', { locale: es })}</span>
@@ -369,4 +369,3 @@ export function TransactionHistoryTable() {
     </TooltipProvider>
   );
 }
-
