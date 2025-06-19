@@ -8,26 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Trash2, Eye } from 'lucide-react'; 
+import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Eye } from 'lucide-react'; 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"; // AlertDialogTrigger is used directly
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog';
 import { TransactionDetailsDialog } from './TransactionDetailsDialog'; 
-import { deletePurchaseAction } from '@/lib/actions';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +25,7 @@ const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__";
 
 export function TransactionHistoryTable() {
   const { purchases, settings } = useAppState();
-  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStore } = useAppDispatch();
+  const { exportToCSV, isInitialized } = useAppDispatch(); // deletePurchaseFromStore removed
   const { toast } = useToast();
   
   const [filterMonth, setFilterMonth] = useState<string>('');
@@ -50,8 +39,7 @@ export function TransactionHistoryTable() {
   const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState(false);
   const [selectedPurchaseForDetails, setSelectedPurchaseForDetails] = useState<Purchase | null>(null);
 
-  const [isDeleting, setIsDeleting] = useState(false);
-
+  // isDeleting state and handleDeletePurchase function removed
 
   const uniqueMonths = useMemo(() => {
     const months = new Set<string>();
@@ -97,28 +85,6 @@ export function TransactionHistoryTable() {
     setSelectedPurchaseForDetails(purchase);
     setIsDetailsDialogOpen(true);
   };
-
-  const handleDeletePurchase = async (purchaseId: string) => {
-    console.log(`[TransactionHistoryTable] handleDeletePurchase called for ID: ${purchaseId}`);
-    setIsDeleting(true);
-    try {
-      const result = await deletePurchaseAction(purchaseId);
-      console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseId}:`, result);
-
-      if (result.success) {
-        deletePurchaseFromStore(purchaseId);
-        toast({ title: "Eliminación Exitosa", description: result.message });
-      } else {
-        toast({ title: "Error al Eliminar", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
-      }
-    } catch (error: any) {
-      console.error(`[TransactionHistoryTable] Error deleting purchase ID ${purchaseId}:`, error);
-      toast({ title: "Error Inesperado", description: `Ocurrió un error al intentar eliminar la compra: ${error.message}`, variant: "destructive" });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
 
   if (!isInitialized) {
     return (
@@ -280,40 +246,7 @@ export function TransactionHistoryTable() {
                           <p>Editar Compra</p>
                         </TooltipContent>
                       </Tooltip>
-                      <AlertDialog>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive">
-                                    <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                <p>Eliminar Compra</p>
-                            </TooltipContent>
-                        </Tooltip>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Esta acción no se puede deshacer. Esto eliminará permanentemente la compra de
-                              "{purchase.merchantName}" por {formatCurrency(purchase.finalAmount)} del {format(parseISO(purchase.date), 'dd/MM/yyyy')}.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => {
-                                handleDeletePurchase(purchase.id);
-                              }}
-                              disabled={isDeleting}
-                              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-                            >
-                              {isDeleting ? <LoadingSpinner size={16} className="mr-2" /> : null}
-                              Eliminar
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      {/* Delete Button and AlertDialog removed */}
                     </div>
                   </TableCell>
                 </TableRow>

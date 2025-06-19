@@ -62,17 +62,7 @@ export async function editPurchaseAction(purchaseId: string, data: PurchaseFormD
   return { success: true, message: "Compra actualizada exitosamente.", purchase: updatedPurchase };
 }
 
-export async function deletePurchaseAction(purchaseId: string): Promise<{ success: boolean; message: string }> {
-  console.log(`[Server Action] deletePurchaseAction called for ID: ${purchaseId}`);
-  // En una aplicación real, la eliminación en la base de datos ocurriría aquí.
-  // Para este prototipo, simulamos el éxito.
-
-  revalidatePath('/'); 
-  revalidatePath('/history'); 
-
-  return { success: true, message: "Compra eliminada exitosamente." };
-}
-
+// deletePurchaseAction has been removed
 
 export async function updateSettingsAction(data: SettingsFormData): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
   console.log("[Server Action] updateSettingsAction called with data:", data);
