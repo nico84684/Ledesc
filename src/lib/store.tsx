@@ -55,54 +55,56 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (storedState) {
-      try {
-        const parsedState = JSON.parse(storedState) as AppState;
-        const currentSettings = { 
-          ...DEFAULT_BENEFIT_SETTINGS, 
-          ...parsedState.settings,
-          autoBackupToDrive: parsedState.settings.autoBackupToDrive === undefined ? DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive : parsedState.settings.autoBackupToDrive,
-          lastBackupTimestamp: parsedState.settings.lastBackupTimestamp || DEFAULT_BENEFIT_SETTINGS.lastBackupTimestamp,
-          enableEndOfMonthReminder: parsedState.settings.enableEndOfMonthReminder === undefined ? DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder : parsedState.settings.enableEndOfMonthReminder,
-          daysBeforeEndOfMonthToRemind: parsedState.settings.daysBeforeEndOfMonthToRemind === undefined ? DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind : parsedState.settings.daysBeforeEndOfMonthToRemind,
-        };
-        
-        parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
-          ...p,
-          date: p.date,
-        }));
-        parsedState.merchants = parsedState.merchants || [];
-        parsedState.merchants = parsedState.merchants.map((m: Merchant) => ({
-          id: m.id,
-          name: m.name,
-          location: m.location,
-        }));
-        setState({ 
-          ...parsedState, 
-          settings: currentSettings,
-          lastEndOfMonthReminderShownForMonth: parsedState.lastEndOfMonthReminderShownForMonth 
-        });
-        previousPurchasesRef.current = parsedState.purchases; 
-        previousMerchantsRef.current = parsedState.merchants;
-      } catch (error) {
-        console.error("Failed to parse state from localStorage", error);
+    if (typeof window !== 'undefined') {
+      const storedState = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (storedState) {
+        try {
+          const parsedState = JSON.parse(storedState) as AppState;
+          const currentSettings = { 
+            ...DEFAULT_BENEFIT_SETTINGS, 
+            ...parsedState.settings,
+            autoBackupToDrive: parsedState.settings.autoBackupToDrive === undefined ? DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive : parsedState.settings.autoBackupToDrive,
+            lastBackupTimestamp: parsedState.settings.lastBackupTimestamp || DEFAULT_BENEFIT_SETTINGS.lastBackupTimestamp,
+            enableEndOfMonthReminder: parsedState.settings.enableEndOfMonthReminder === undefined ? DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder : parsedState.settings.enableEndOfMonthReminder,
+            daysBeforeEndOfMonthToRemind: parsedState.settings.daysBeforeEndOfMonthToRemind === undefined ? DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind : parsedState.settings.daysBeforeEndOfMonthToRemind,
+          };
+          
+          parsedState.purchases = parsedState.purchases.map((p: Purchase) => ({
+            ...p,
+            date: p.date,
+          }));
+          parsedState.merchants = parsedState.merchants || [];
+          parsedState.merchants = parsedState.merchants.map((m: Merchant) => ({
+            id: m.id,
+            name: m.name,
+            location: m.location,
+          }));
+          setState({ 
+            ...parsedState, 
+            settings: currentSettings,
+            lastEndOfMonthReminderShownForMonth: parsedState.lastEndOfMonthReminderShownForMonth 
+          });
+          previousPurchasesRef.current = parsedState.purchases; 
+          previousMerchantsRef.current = parsedState.merchants;
+        } catch (error) {
+          console.error("Failed to parse state from localStorage", error);
+          setState(prevState => ({
+            ...prevState, 
+            settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings },
+            lastEndOfMonthReminderShownForMonth: undefined,
+          }));
+          previousPurchasesRef.current = []; 
+          previousMerchantsRef.current = [];
+        }
+      } else {
         setState(prevState => ({
           ...prevState, 
-          settings: { ...DEFAULT_BENEFIT_SETTINGS, ...prevState.settings },
+          settings: DEFAULT_BENEFIT_SETTINGS,
           lastEndOfMonthReminderShownForMonth: undefined,
         }));
-        previousPurchasesRef.current = []; 
+        previousPurchasesRef.current = [];
         previousMerchantsRef.current = [];
       }
-    } else {
-      setState(prevState => ({
-        ...prevState, 
-        settings: DEFAULT_BENEFIT_SETTINGS,
-        lastEndOfMonthReminderShownForMonth: undefined,
-      }));
-      previousPurchasesRef.current = [];
-      previousMerchantsRef.current = [];
     }
     setIsInitialized(true);
   }, []); 
@@ -150,7 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
 
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && typeof window !== 'undefined') {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
         if (!setupComplete && pathname !== '/settings') {
@@ -367,18 +369,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     console.log(`[AppStore] Attempting to delete purchase with ID: ${purchaseId}`);
     setState(prevState => {
       const initialCount = prevState.purchases.length;
-      const updatedPurchases = prevState.purchases.filter(p => {
-        // console.log(`[AppStore] Comparing ${p.id} with ${purchaseId}. Match: ${p.id === purchaseId}`);
-        return p.id !== purchaseId;
-      });
+      const updatedPurchases = prevState.purchases.filter(p => p.id !== purchaseId);
       const finalCount = updatedPurchases.length;
 
       if (initialCount === finalCount && prevState.purchases.some(p => p.id === purchaseId)) {
         console.warn(`[AppStore] Purchase ID ${purchaseId} was found but the filter did not remove it. This is unexpected.`);
+         return prevState; // Devuelve el estado anterior si no hubo cambios para evitar re-renders innecesarios
       } else if (initialCount > finalCount) {
          console.log(`[AppStore] Purchase ID ${purchaseId} successfully removed from client state. Count before: ${initialCount}, after: ${finalCount}.`);
       } else {
          console.log(`[AppStore] Purchase ID ${purchaseId} not found or no change in count. Count before: ${initialCount}, after: ${finalCount}.`);
+         return prevState; // Devuelve el estado anterior si no hubo cambios
       }
       return { ...prevState, purchases: updatedPurchases };
     });
