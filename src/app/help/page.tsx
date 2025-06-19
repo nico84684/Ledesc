@@ -3,7 +3,7 @@ import { Metadata } from 'next';
 import { APP_NAME } from '@/config/constants';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck, MailQuestion, MessageSquare, Send, Smartphone, Share, MoreVertical, PlusSquare } from 'lucide-react';
+import { HelpCircle, TrendingUp, ShoppingCart, History, Store, Settings, FileUp, FileDown, BellRing, Search, UserCheck, MailQuestion, MessageSquare, Send, Smartphone, Share, MoreVertical, PlusSquare, Cloud, Lock } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: `Centro de Ayuda - ${APP_NAME}`,
@@ -168,17 +168,18 @@ export default function HelpPage() {
                 
                 <p><strong><UserCheck className="inline h-5 w-5 text-blue-600" /> Autenticación (Inicio de Sesión):</strong></p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                    <li>Inicia sesión con tu cuenta de Google para habilitar las funciones de Backup y Restauración en Google Drive.</li>
-                    <li>La aplicación solicitará permiso para acceder a los archivos que crea (`drive.file`), no a todo tu Drive.</li>
+                    <li>Inicia sesión con tu cuenta de Google para habilitar las funciones de Backup y Restauración en Google Drive, así como la sincronización de tus datos (compras, comercios, configuración) entre dispositivos.</li>
+                    <li>Si no inicias sesión, tus datos se guardan únicamente en el navegador y dispositivo actual.</li>
+                    <li>La aplicación solicitará permiso para acceder a los archivos que crea (`drive.file`) solo si utilizas la función de Backup/Restauración a Google Drive, no a todo tu Drive.</li>
                 </ul>
 
                 <p><strong><FileUp className="inline h-5 w-5 text-green-600" /> Gestión de Datos - Backup (Copia de Seguridad):</strong></p>
                 <p>Guarda tus datos para protegerlos o transferirlos:</p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                  <li><strong>A Excel:</strong> Descarga un archivo Excel (.xlsx) con tus compras y comercios. Esto también actualiza la "fecha del último backup".</li>
-                  <li><strong>A Google Drive:</strong> (Requiere inicio de sesión) Guarda un archivo JSON en una carpeta específica (`LEDESC_App_Backups`) en tu Google Drive. Esto también actualiza la "fecha del último backup".</li>
-                  <li><strong>Backup Automático a Google Drive:</strong> Si está activo (y has iniciado sesión), la app intentará hacer un backup a Drive automáticamente después de cada nueva compra o cambio en la lista de comercios.</li>
-                  <li>Se muestra la fecha del último backup realizado (Excel o Drive) y cuántos datos nuevos hay desde entonces.</li>
+                  <li><strong>A Excel:</strong> Descarga un archivo Excel (.xlsx) con tus compras y comercios. Esto actualiza la "fecha del último backup" (local o en la nube según estés logueado).</li>
+                  <li><strong>A Google Drive:</strong> (Requiere inicio de sesión) Guarda un archivo JSON en una carpeta específica (`LEDESC_App_Backups`) en tu Google Drive. Esto actualiza la "fecha del último backup".</li>
+                  <li><strong>Backup Automático a Google Drive:</strong> Si está activo (y has iniciado sesión), la app intentará hacer un backup a Drive automáticamente después de cada nueva compra o cambio en la lista de comercios o configuración.</li>
+                  <li>Se muestra la fecha del último backup realizado y cuántos datos nuevos hay desde entonces.</li>
                 </ul>
 
                 <p><strong><FileDown className="inline h-5 w-5 text-red-600" /> Gestión de Datos - Restauración:</strong></p>
@@ -189,6 +190,43 @@ export default function HelpPage() {
                   <li><strong>Desde Excel:</strong> Selecciona un archivo Excel (.xlsx) previamente guardado por la app. Debe contener las hojas "Compras" y "Comercios" con el formato correcto.</li>
                   <li><strong>Desde Google Drive:</strong> (Requiere inicio de sesión) Restaura la última versión del archivo de backup guardado en tu Google Drive. Esto también restaurará la configuración guardada en ese backup.</li>
                 </ul>
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="item-cloud-privacy">
+              <AccordionTrigger className="text-lg hover:no-underline">
+                <div className="flex items-center gap-2">
+                  <Cloud className="h-5 w-5 text-primary" />
+                  Datos en la Nube y Privacidad
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="space-y-4 text-base pl-2">
+                <p><strong>¿Cómo se guardan mis datos si inicio sesión?</strong></p>
+                <p>
+                  Si eliges iniciar sesión con tu cuenta de Google, tus datos de la aplicación (compras, comercios y configuración) se almacenan de forma segura en <strong>Firebase Firestore</strong>, una base de datos en la nube proporcionada por Google. Esto permite las siguientes ventajas:
+                </p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li><strong>Sincronización Multiplataforma:</strong> Accede a tus datos actualizados desde cualquier dispositivo (PC, móvil, tablet) donde inicies sesión con la misma cuenta.</li>
+                  <li><strong>Persistencia:</strong> Tus datos no se pierden si cambias de navegador o dispositivo.</li>
+                </ul>
+                <p>Si no inicias sesión, tus datos se guardan únicamente de forma local en el navegador que estés utilizando y no se sincronizarán.</p>
+
+                <p><strong><Lock className="inline h-4 w-4 text-green-600 mr-1" />Seguridad de tus Datos:</strong></p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li>Utilizamos las reglas de seguridad de Firebase Firestore para asegurar que solo tú, con tu cuenta autenticada, puedas acceder y modificar tus propios datos. Nadie más tiene acceso a tu información personal almacenada en la nube.</li>
+                  <li>Tu contraseña de Google nunca es almacenada ni vista por {APP_NAME}. La autenticación se maneja de forma segura a través de los servicios de Google.</li>
+                </ul>
+
+                <p><strong><UserCheck className="inline h-4 w-4 text-blue-600 mr-1" />Permisos de Google Drive:</strong></p>
+                <ul className="list-disc list-inside pl-4 space-y-1">
+                  <li>La función de "Backup a Google Drive" y "Restaurar desde Google Drive" es opcional y requiere tu autorización explícita.</li>
+                  <li>Si la utilizas, {APP_NAME} solicitará permiso para el ámbito `drive.file`. Esto significa que la aplicación <strong>solo puede acceder a los archivos que ella misma crea o que tú específicamente abres con ella</strong>.</li>
+                  <li>{APP_NAME} creará una carpeta específica llamada `LEDESC_App_Backups` en tu Google Drive para almacenar los archivos de copia de seguridad. La aplicación no tiene acceso a ningún otro archivo o carpeta en tu Drive.</li>
+                </ul>
+                
+                <p><strong>No Compartimos tus Datos:</strong></p>
+                <p>Tu información personal y los datos de tus transacciones no se comparten con terceros sin tu consentimiento explícito.</p>
+                <p>Si tienes más preguntas sobre la privacidad o el manejo de tus datos, no dudes en contactarnos a través del formulario de la sección "Contacto".</p>
               </AccordionContent>
             </AccordionItem>
 
