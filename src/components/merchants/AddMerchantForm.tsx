@@ -6,17 +6,19 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AddMerchantFormSchema, type AddMerchantFormData } from '@/lib/schemas';
 import { addManualMerchantAction } from '@/lib/actions';
-import { useAppDispatch } from '@/lib/store';
+import { useAppDispatch } from '@/lib/store'; // El store ahora maneja la escritura a Firestore
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Loader2, PlusCircle, Building2, MapPin } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/components/layout/Providers';
 
 export function AddMerchantForm() {
-  const { addMerchant: addMerchantToStore } = useAppDispatch();
+  const { addMerchant: addMerchantToStoreAndFirestore } = useAppDispatch(); // Renombrado para claridad
   const { toast } = useToast();
+  const { user } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<AddMerchantFormData>({
@@ -28,24 +30,21 @@ export function AddMerchantForm() {
   });
 
   async function onSubmit(data: AddMerchantFormData) {
+    if (!user || !user.uid) {
+        toast({ title: "Error", description: "Debes iniciar sesión para añadir comercios.", variant: "destructive" });
+        return;
+    }
     setIsSubmitting(true);
     try {
-      // La acción del servidor solo procesa la solicitud, la lógica de unicidad está en el store
-      const actionResult = await addManualMerchantAction(data); 
+      // La función addMerchant del store ahora se encarga de llamar a la acción del servidor
+      // (que escribe en Firestore) y de actualizar el estado local si es necesario (o confiar en onSnapshot).
+      const storeResult = await addMerchantToStoreAndFirestore(data.name, data.location);
 
-      if (actionResult.success && actionResult.merchant) {
-        // addMerchantToStore ahora maneja la lógica de unicidad (nombre + ubicación)
-        const storeResult = addMerchantToStore(actionResult.merchant.name, actionResult.merchant.location);
-        if (storeResult.success && storeResult.merchant) {
+      if (storeResult.success && storeResult.merchant) {
           toast({ title: "Éxito", description: storeResult.message });
           form.reset();
-        } else {
-          // Si el store indica que ya existe o hubo otro problema
-          toast({ title: "Información", description: storeResult.message || "No se pudo añadir el comercio.", variant: 'default' });
-        }
       } else {
-        // Error de la acción del servidor (poco probable en este setup simple)
-        toast({ title: "Error", description: actionResult.message || "No se pudo procesar el registro del comercio.", variant: 'destructive' });
+          toast({ title: "Información", description: storeResult.message || "No se pudo añadir el comercio.", variant: storeResult.success ? 'default' : 'destructive' });
       }
     } catch (error) {
       toast({ title: "Error Inesperado", description: "Ocurrió un error al registrar el comercio.", variant: 'destructive' });
@@ -61,7 +60,7 @@ export function AddMerchantForm() {
           <Building2 className="h-5 w-5 text-primary" />
           Añadir Nuevo Comercio
         </CardTitle>
-        <CardDescription>Registra un nuevo comercio manualmente. Se considera único por nombre y ubicación.</CardDescription>
+        <CardDescription>Registra un nuevo comercio manualmente. Se considera único por nombre y ubicación. Se guardará en la nube.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -95,7 +94,7 @@ export function AddMerchantForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button type="submit" className="w-full" disabled={isSubmitting || !user}>
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -103,6 +102,7 @@ export function AddMerchantForm() {
               )}
               {isSubmitting ? 'Registrando...' : 'Añadir Comercio'}
             </Button>
+            {!user && <p className="text-sm text-center text-destructive mt-2">Debes iniciar sesión para añadir comercios.</p>}
           </form>
         </Form>
       </CardContent>

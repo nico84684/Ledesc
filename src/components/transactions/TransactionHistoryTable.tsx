@@ -28,16 +28,17 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  // AlertDialogTrigger, // No se usa directamente aquí para el botón de la fila
 } from "@/components/ui/alert-dialog";
 import { deletePurchaseAction } from '@/lib/actions';
+import { useAuth } from '@/components/layout/Providers';
 
 const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
 
 export function TransactionHistoryTable() {
-  const { purchases, settings } = useAppState();
-  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStore } = useAppDispatch();
+  const { purchases, settings } = useAppState(); // purchases ahora vienen de Firestore via onSnapshot
+  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStoreAndFirestore } = useAppDispatch(); // Renombrado para claridad
+  const { user } = useAuth();
   const { toast } = useToast();
   
   const [filterMonth, setFilterMonth] = useState<string>('');
@@ -69,7 +70,7 @@ export function TransactionHistoryTable() {
       const matchesMerchant = filterMerchant ? p.merchantName.toLowerCase().includes(filterMerchant.toLowerCase()) : true;
       const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true;
       return matchesMonth && matchesMerchant && matchesAmount;
-    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // Ya ordenadas por Firestore, pero re-ordenar por si acaso o si el filtro cambia el orden.
   }, [purchases, filterMonth, filterMerchant, filterAmount]);
 
   const paginatedPurchases = useMemo(() => {
@@ -91,6 +92,10 @@ export function TransactionHistoryTable() {
   };
 
   const handleEditClick = (purchase: Purchase) => {
+    if (!user) {
+        toast({title: "Acción no permitida", description: "Debes iniciar sesión para editar compras.", variant: "destructive"});
+        return;
+    }
     setSelectedPurchaseForEdit(purchase);
     setIsEditDialogOpen(true);
   };
@@ -101,21 +106,32 @@ export function TransactionHistoryTable() {
   };
 
   const handleDeleteClick = (purchase: Purchase) => {
+    if (!user) {
+        toast({title: "Acción no permitida", description: "Debes iniciar sesión para eliminar compras.", variant: "destructive"});
+        return;
+    }
     console.log(`[TransactionHistoryTable] handleDeleteClick called for ID: ${purchase.id}`);
     setSelectedPurchaseForDelete(purchase);
   };
 
   const confirmDeletePurchase = async () => {
-    if (!selectedPurchaseForDelete) return;
+    if (!selectedPurchaseForDelete || !user || !user.uid) {
+        toast({title: "Error", description: "No se seleccionó compra o usuario no autenticado.", variant: "destructive"});
+        return;
+    }
     const purchaseIdToDelete = selectedPurchaseForDelete.id;
-    console.log(`[TransactionHistoryTable] confirmDeletePurchase called for ID: ${purchaseIdToDelete}`);
+    console.log(`[TransactionHistoryTable] confirmDeletePurchase called for UserID: ${user.uid}, PurchaseID: ${purchaseIdToDelete}`);
     setIsDeleting(true);
     try {
-      const result = await deletePurchaseAction(purchaseIdToDelete);
+      // La acción del servidor ahora requiere userId
+      const result = await deletePurchaseAction(user.uid, purchaseIdToDelete);
       console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseIdToDelete}:`, result);
 
       if (result.success) {
-        deletePurchaseFromStore(purchaseIdToDelete);
+        // deletePurchaseFromStoreAndFirestore ahora solo actualiza el estado local si es necesario (onSnapshot debería hacerlo)
+        // o se podría quitar si confiamos 100% en onSnapshot.
+        // Por ahora, la función en el store es la que realmente llama a deleteDoc en Firestore.
+        await deletePurchaseFromStoreAndFirestore(purchaseIdToDelete); 
         toast({ title: "Eliminación Exitosa", description: result.message });
       } else {
         toast({ title: "Error al Eliminar", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
@@ -130,11 +146,11 @@ export function TransactionHistoryTable() {
   };
 
 
-  if (!isInitialized) {
+  if (!isInitialized) { // isInitialized del store ahora significa que Firestore está listo (o falló la carga inicial)
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner size={48} />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando transacciones...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Cargando transacciones desde la nube...</p>
       </div>
     );
   }
@@ -197,7 +213,7 @@ export function TransactionHistoryTable() {
           <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
             <FilterX className="mr-2 h-4 w-4" /> Limpiar
           </Button>
-          <Button onClick={exportToCSV} className="w-full sm:w-auto">
+          <Button onClick={exportToCSV} className="w-full sm:w-auto" disabled={!user}>
             <Download className="mr-2 h-4 w-4" /> Exportar
           </Button>
         </div>
@@ -206,15 +222,19 @@ export function TransactionHistoryTable() {
       {paginatedPurchases.length === 0 ? (
         <div className="text-center py-10">
           <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
-          <p className="mt-4 text-lg font-medium text-muted-foreground">No se encontraron transacciones.</p>
-          <p className="text-sm text-muted-foreground">Intenta ajustar los filtros o registra una nueva compra.</p>
+          <p className="mt-4 text-lg font-medium text-muted-foreground">
+            { user ? "No se encontraron transacciones." : "Inicia sesión para ver tus transacciones."}
+          </p>
+          <p className="text-sm text-muted-foreground">
+           { user ? "Intenta ajustar los filtros o registra una nueva compra." : "Tus datos se guardan en la nube de forma segura."}
+          </p>
         </div>
       ) : (
         <div className="overflow-x-auto rounded-lg border shadow-sm">
           <Table>
             <TableCaption>
               Mostrando {paginatedPurchases.length} de {filteredPurchases.length} transacciones.
-              Descuento aplicado: {settings.discountPercentage}%.
+              {settings && ` Descuento aplicado: ${settings.discountPercentage}%.`}
             </TableCaption>
             <TableHeader>
               <TableRow className="text-xxs sm:text-sm">
@@ -282,7 +302,7 @@ export function TransactionHistoryTable() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => handleEditClick(purchase)}>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => handleEditClick(purchase)} disabled={!user}>
                             <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
                           </Button>
                         </TooltipTrigger>
@@ -292,13 +312,12 @@ export function TransactionHistoryTable() {
                       </Tooltip>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          {/* Se eliminó AlertDialogTrigger de aquí */}
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive" 
                             onClick={() => handleDeleteClick(purchase)} 
-                            disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id}
+                            disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id || !user}
                           >
                             {isDeleting && selectedPurchaseForDelete?.id === purchase.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
                           </Button>
@@ -362,14 +381,13 @@ export function TransactionHistoryTable() {
         />
       )}
       
-      {/* El AlertDialog se mantiene aquí, controlado por selectedPurchaseForDelete */}
       {selectedPurchaseForDelete && (
         <AlertDialog open={!!selectedPurchaseForDelete} onOpenChange={(open) => { if (!open) setSelectedPurchaseForDelete(null); }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta compra?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. La compra realizada el {format(parseISO(selectedPurchaseForDelete.date), "dd 'de' MMMM 'de' yyyy", { locale: es })} por {formatCurrency(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente.
+                Esta acción no se puede deshacer. La compra realizada el {format(parseISO(selectedPurchaseForDelete.date), "dd 'de' MMMM 'de' yyyy", { locale: es })} por {formatCurrency(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente de la nube.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -386,4 +404,3 @@ export function TransactionHistoryTable() {
     </TooltipProvider>
   );
 }
-

@@ -1,48 +1,48 @@
+
 "use client";
 
 import { PurchaseForm } from '@/components/purchases/PurchaseForm';
-// APP_NAME can be imported if needed for other parts of the component, but not for metadata here.
-// import { APP_NAME } from '@/config/constants'; 
 import { addPurchaseAction } from '@/lib/actions';
 import { useAppState, useAppDispatch } from '@/lib/store';
 import type { PurchaseFormData } from '@/lib/schemas';
-// Metadata import removed as it's no longer exported here.
-// import type { Metadata } from 'next'; 
+import { useAuth } from '@/components/layout/Providers';
+import { useToast } from '@/hooks/use-toast';
+import { APP_NAME } from '@/config/constants'; // Importar APP_NAME
+import { format, parseISO } from 'date-fns';
 
-// Metadata cannot be exported from a client component.
-// If metadata is needed for this route, it should be defined in a parent layout
-// or the page should be a server component using generateMetadata.
-//
-// export const metadata: Metadata = {
-//   title: `Registrar Compra - ${APP_NAME}`,
-//   description: 'Registra una nueva compra gastronómica.',
-// };
 
 export default function AddPurchasePage() {
   const { settings } = useAppState();
-  const { addPurchase: addPurchaseToStore } = useAppDispatch();
-  // const { toast } = useToast(); // Toast is handled by PurchaseForm internally
+  const { addPurchase: addPurchaseToStore } = useAppDispatch(); // El store ahora maneja la escritura a Firestore
+  const { user } = useAuth();
+  const { toast } = useToast();
 
   const handleAddSubmit = async (data: PurchaseFormData): Promise<{success: boolean, message: string}> => {
+    if (!user || !user.uid) {
+        return { success: false, message: "Debes iniciar sesión para registrar una compra."};
+    }
     if (!settings) {
-        // This case should ideally not happen if useAppState provides default settings
         return { success: false, message: "Error: Configuración no disponible."};
     }
     try {
-      // Server action call
-      const result = await addPurchaseAction(data, settings);
-      if (result.success && result.purchase) {
-        // Update client-side store
-        // The store's addPurchase function expects the raw data and calculates discount/finalAmount
-        const storeData = {
-            amount: result.purchase.amount,
-            date: result.purchase.date,
-            merchantName: result.purchase.merchantName,
-            merchantLocation: result.purchase.merchantLocation,
-            description: result.purchase.description,
-            receiptImageUrl: result.purchase.receiptImageUrl,
-        };
-        addPurchaseToStore(storeData);
+      // La acción del servidor ahora requiere userId
+      const result = await addPurchaseAction(user.uid, data, settings);
+      if (result.success && result.purchaseId) {
+        // addPurchaseToStore en el cliente ya no es estrictamente necesario si confiamos en onSnapshot,
+        // pero puede usarse para una actualización optimista o si onSnapshot no está implementado para todo.
+        // Por ahora, la acción del servidor escribe en Firestore, y onSnapshot debería actualizar el estado.
+        // El toast de éxito se mostrará desde PurchaseForm.
+
+        // Lógica de alerta de límite:
+        const currentMonth = format(parseISO(data.date), 'yyyy-MM');
+        // Necesitamos leer las compras del estado actual para calcular el gasto del mes.
+        // Esto es un poco complicado porque el estado se actualiza asíncronamente por onSnapshot.
+        // Una solución más robusta sería que la server action o una función en la nube calcule esto
+        // o que el cliente espere la actualización del estado.
+        // Por simplicidad inmediata, omitiremos la alerta de límite aquí,
+        // ya que el estado local inmediato puede no reflejar la nueva compra hasta que onSnapshot actúe.
+        // La alerta de límite se podría reimplementar observando los cambios en `state.purchases` en `AppProvider`.
+        
         return { success: true, message: result.message };
       } else {
         return { success: false, message: result.message || "No se pudo registrar la compra." };
@@ -55,7 +55,6 @@ export default function AddPurchasePage() {
 
   return (
     <div className="container mx-auto py-8">
-      {/* Pass the handler to PurchaseForm */}
       <PurchaseForm onSubmitPurchase={handleAddSubmit} />
     </div>
   );

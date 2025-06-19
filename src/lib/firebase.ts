@@ -3,6 +3,7 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth"; // Import Auth type
 import { getAnalytics, type Analytics } from "firebase/analytics";
+import { getFirestore, type Firestore } from "firebase/firestore"; // Importar Firestore
 
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
@@ -20,16 +21,17 @@ const firebaseConfig = {
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let analytics: Analytics | undefined;
+let db: Firestore | undefined; // Declarar db para Firestore
 
-export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, auth: Auth | undefined } {
+export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, auth: Auth | undefined, db: Firestore | undefined } {
   if (typeof window === 'undefined') {
     console.warn("[Firebase Core] Not initializing on server (ensureFirebaseInitialized).");
-    return { app, auth };
+    return { app, auth, db };
   }
 
-  if (app && auth) {
+  if (app && auth && db) {
     // Already initialized
-    return { app, auth };
+    return { app, auth, db };
   }
 
   try {
@@ -42,17 +44,24 @@ export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, aut
       console.log("[Firebase Core] FirebaseApp instance retrieved.");
     }
 
-    if (app && !auth) {
-        console.log("[Firebase Core] Initializing Firebase Auth...");
-        auth = getAuth(app);
-        console.log("[Firebase Core] Firebase Auth initialized.");
-    } else if (!app) {
+    if (app) {
+        if (!auth) {
+            console.log("[Firebase Core] Initializing Firebase Auth...");
+            auth = getAuth(app);
+            console.log("[Firebase Core] Firebase Auth initialized.");
+        }
+        if (!db) {
+            console.log("[Firebase Core] Initializing Firestore...");
+            db = getFirestore(app);
+            console.log("[Firebase Core] Firestore initialized.");
+        }
+    } else {
         console.warn("[Firebase Core] FirebaseApp is not available after initialization attempt (ensureFirebaseInitialized).");
     }
   } catch (error: any) {
-    console.error("[Firebase Core] Error during Firebase App/Auth initialization (ensureFirebaseInitialized):", error, error.stack);
+    console.error("[Firebase Core] Error during Firebase App/Auth/DB initialization (ensureFirebaseInitialized):", error, error.stack);
   }
-  return { app, auth };
+  return { app, auth, db };
 }
 
 
@@ -85,4 +94,5 @@ export function ensureAnalyticsInitialized(): Analytics | undefined {
 }
 
 // Export them, they will be undefined until ensureFirebaseInitialized/ensureAnalyticsInitialized are called
-export { app, auth, analytics };
+export { app, auth, analytics, db };
+
