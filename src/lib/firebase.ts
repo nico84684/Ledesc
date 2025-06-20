@@ -1,4 +1,3 @@
-
 // Import the functions you need from the SDKs you need
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth"; // Import Auth type
@@ -24,16 +23,8 @@ let analytics: Analytics | undefined;
 let db: Firestore | undefined; // Declarar db para Firestore
 
 export function ensureFirebaseInitialized(): { app: FirebaseApp | undefined, auth: Auth | undefined, db: Firestore | undefined } {
-  if (typeof window === 'undefined') {
-    console.warn("[Firebase Core] Not initializing on server (ensureFirebaseInitialized).");
-    return { app, auth, db };
-  }
-
-  if (app && auth && db) {
-    // Already initialized
-    return { app, auth, db };
-  }
-
+  // This function is now isomorphic and can run on the server or client.
+  // The getApps check prevents re-initialization.
   try {
     if (getApps().length === 0) {
       console.log("[Firebase Core] Initializing FirebaseApp...");
@@ -95,4 +86,3 @@ export function ensureAnalyticsInitialized(): Analytics | undefined {
 
 // Export them, they will be undefined until ensureFirebaseInitialized/ensureAnalyticsInitialized are called
 export { app, auth, analytics, db };
-
