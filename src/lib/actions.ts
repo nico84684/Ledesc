@@ -5,8 +5,8 @@
 import type { PurchaseFormData, AddMerchantFormData, ContactFormData } from '@/lib/schemas';
 import type { Purchase, BenefitSettings, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
-import { backupDataToDrive, type DriveBackupInput, type DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
-import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
+import type { DriveBackupInput, DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
+import type { DriveRestoreInput, DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
 import { APP_NAME, DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, writeBatch, query, where, deleteDoc, orderBy } from "firebase/firestore";
 import { ensureFirebaseInitialized } from '@/lib/firebase';
@@ -161,12 +161,6 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
 
   if (typeof data.lastEndOfMonthReminderShownForMonth === 'string' && data.lastEndOfMonthReminderShownForMonth.trim() !== '') {
     settingsToSave.lastEndOfMonthReminderShownForMonth = data.lastEndOfMonthReminderShownForMonth;
-  } else if (data.lastEndOfMonthReminderShownForMonth === null) {
-     // If explicitly null, we let Firestore remove it or store it as null if the field exists
-     // For 'merge: true', omitting it is often cleaner if the intent is to not set it.
-     // However, if we want to explicitly clear it in Firestore, we might need to send null,
-     // but the type BenefitSettings suggests it's optional (string | undefined).
-     // For now, if it's null, we'll treat it as undefined by not setting it.
   }
   // lastLocalSaveTimestamp is not saved to Firestore from this action.
 
@@ -239,6 +233,7 @@ export async function triggerGoogleDriveBackupAction(
   if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
   console.log("[Server Action] triggerGoogleDriveBackupAction called for userID:", userId);
   try {
+    const { backupDataToDrive } = await import('@/ai/flows/driveBackupFlow');
     const result = await backupDataToDrive({ userId, userEmail, purchasesData, merchantsData, settingsData, accessToken });
     if (result.success) {
       const db = await getDbInstance();
@@ -258,6 +253,7 @@ export async function triggerGoogleDriveRestoreAction(
   if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
   console.log("[Server Action] triggerGoogleDriveRestoreAction called for userID:", userId);
   try {
+    const { restoreDataFromDrive } = await import('@/ai/flows/restoreDataFromDriveFlow');
     const result = await restoreDataFromDrive({ userId, userEmail, accessToken });
     if (result.success && result.purchasesData && result.merchantsData && result.settingsData) {
       console.log("[Server Action] triggerGoogleDriveRestoreAction - Data received from Drive, preparing Firestore batch write.");
@@ -273,7 +269,7 @@ export async function triggerGoogleDriveRestoreAction(
         lastBackupTimestamp: typeof settingsFromDrive.lastBackupTimestamp === 'number' ? settingsFromDrive.lastBackupTimestamp : Date.now(),
         enableEndOfMonthReminder: typeof settingsFromDrive.enableEndOfMonthReminder === 'boolean' ? settingsFromDrive.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder,
         daysBeforeEndOfMonthToRemind: typeof settingsFromDrive.daysBeforeEndOfMonthToRemind === 'number' ? settingsFromDrive.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind,
-        lastEndOfMonthReminderShownForMonth: (settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null) ? undefined : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
+        lastEndOfMonthReminderShownForMonth: settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null ? undefined : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
       };
       batch.set(doc(db, "users", userId, "settings", "main"), completeSettings);
 
@@ -307,7 +303,6 @@ export async function triggerGoogleDriveRestoreAction(
 }
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
-  const { Resend } = await import('resend');
   const targetEmail = "nicolas.s.fernandez@gmail.com";
   const resendApiKey = process.env.RESEND_API_KEY;
 
@@ -315,9 +310,10 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
     console.error("[Server Action] contactFormAction: RESEND_API_KEY is not set.");
     return { success: false, message: "Servicio de correo no configurado correctamente." };
   }
-
-  const resend = new Resend(resendApiKey);
+  
   try {
+    const { Resend } = await import('resend');
+    const resend = new Resend(resendApiKey);
     const emailPayload = {
       from: `Contacto ${APP_NAME} <onboarding@resend.dev>`,
       to: [targetEmail],
