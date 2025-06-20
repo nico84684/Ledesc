@@ -7,7 +7,7 @@ import type { Purchase, BenefitSettings, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
 import { backupDataToDrive, type DriveBackupInput, type DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
 import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
-import { APP_NAME } from '@/config/constants';
+import { APP_NAME, DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { Resend } from 'resend';
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, writeBatch, query, where, deleteDoc, orderBy } from "firebase/firestore";
 import { ensureFirebaseInitialized } from '@/lib/firebase';
@@ -28,7 +28,7 @@ export async function addPurchaseAction(userId: string, data: PurchaseFormData, 
   const db = await getDbInstance();
 
   const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
-  const newPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = { // receiptImageUrl is not part of PurchaseFormData
+  const newPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = {
     amount: data.amount,
     date: data.date,
     merchantName: data.merchantName.trim(),
@@ -68,7 +68,7 @@ export async function editPurchaseAction(userId: string, purchaseId: string, dat
   const db = await getDbInstance();
 
   const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
-  const updatedPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = { // receiptImageUrl is not part of PurchaseFormData
+  const updatedPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = {
     amount: data.amount,
     date: data.date,
     merchantName: data.merchantName.trim(),
@@ -119,44 +119,52 @@ export async function deletePurchaseAction(userId: string, purchaseId: string): 
 }
 
 export async function updateSettingsAction(userId: string, data: BenefitSettings): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
-  console.log("[Server Action] updateSettingsAction called for userID:", userId, "with data:", JSON.stringify(data));
+  console.log("[Server Action] updateSettingsAction called for userID:", userId);
+  console.log("[Server Action] updateSettingsAction received data:", JSON.stringify(data, null, 2));
+
   if (!userId) {
     console.error("[Server Action] updateSettingsAction: userId is missing.");
     return { success: false, message: "Usuario no autenticado. Esta acción requiere autenticación." };
   }
 
-  const db = await getDbInstance();
-
-  // Construct the object to save, only including defined properties from BenefitSettings relevant to Firestore.
-  // lastLocalSaveTimestamp is client-side only and not saved to Firestore.
-  const settingsToSave: Partial<BenefitSettings> = {
-    monthlyAllowance: data.monthlyAllowance,
-    discountPercentage: data.discountPercentage,
-    alertThresholdPercentage: data.alertThresholdPercentage,
-    autoBackupToDrive: data.autoBackupToDrive,
-    enableEndOfMonthReminder: data.enableEndOfMonthReminder,
-    daysBeforeEndOfMonthToRemind: data.daysBeforeEndOfMonthToRemind,
-  };
-
-  if (data.lastBackupTimestamp !== undefined) {
-    settingsToSave.lastBackupTimestamp = data.lastBackupTimestamp;
-  } else {
-    settingsToSave.lastBackupTimestamp = 0; // Default to 0 if undefined
+  const { db } = ensureFirebaseInitialized();
+  if (!db) {
+    console.error("[Server Action] updateSettingsAction: Firestore DB instance is not available.");
+    return { success: false, message: "Error interno del servidor: Base de datos no disponible." };
   }
 
-  if (data.lastEndOfMonthReminderShownForMonth !== undefined) {
+  const settingsToSave: { [key: string]: any } = {};
+
+  settingsToSave.monthlyAllowance = typeof data.monthlyAllowance === 'number' ? data.monthlyAllowance : DEFAULT_BENEFIT_SETTINGS.monthlyAllowance;
+  settingsToSave.discountPercentage = typeof data.discountPercentage === 'number' ? data.discountPercentage : DEFAULT_BENEFIT_SETTINGS.discountPercentage;
+  settingsToSave.alertThresholdPercentage = typeof data.alertThresholdPercentage === 'number' ? data.alertThresholdPercentage : DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage;
+  settingsToSave.daysBeforeEndOfMonthToRemind = typeof data.daysBeforeEndOfMonthToRemind === 'number' ? data.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind;
+  
+  settingsToSave.autoBackupToDrive = typeof data.autoBackupToDrive === 'boolean' ? data.autoBackupToDrive : DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive;
+  settingsToSave.enableEndOfMonthReminder = typeof data.enableEndOfMonthReminder === 'boolean' ? data.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder;
+  
+  // lastBackupTimestamp should be a number (epoch) or can be omitted if not set.
+  // Firestore can also handle serverTimestamps, but for this, number is fine.
+  settingsToSave.lastBackupTimestamp = typeof data.lastBackupTimestamp === 'number' ? data.lastBackupTimestamp : 0;
+
+  // lastEndOfMonthReminderShownForMonth is a string or null
+  if (data.lastEndOfMonthReminderShownForMonth === undefined || data.lastEndOfMonthReminderShownForMonth === null) {
+    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
+  } else if (typeof data.lastEndOfMonthReminderShownForMonth === 'string') {
     settingsToSave.lastEndOfMonthReminderShownForMonth = data.lastEndOfMonthReminderShownForMonth;
   } else {
-     // If undefined, Firestore will omit this field when merging, which is fine.
-     // Or set to null if you prefer explicit nulls: settingsToSave.lastEndOfMonthReminderShownForMonth = null;
+     // If it's some other type, default to null to avoid Firestore errors
+    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
   }
-  
-  console.log("[Server Action] updateSettingsAction - settingsToSave for Firestore:", JSON.stringify(settingsToSave));
+  // lastLocalSaveTimestamp is client-side only and not saved to Firestore for authenticated users.
+
+  console.log("[Server Action] updateSettingsAction - Prepared settingsToSave for Firestore:", JSON.stringify(settingsToSave, null, 2));
 
   try {
     const settingsDocRef = doc(db, "users", userId, "settings", "main");
     await setDoc(settingsDocRef, settingsToSave, { merge: true });
     
+    console.log("[Server Action] updateSettingsAction: Firestore setDoc successful.");
     revalidatePath('/');
     revalidatePath('/settings');
     // Return the full 'data' (BenefitSettings type) that was intended to be saved,
@@ -235,41 +243,39 @@ export async function triggerGoogleDriveRestoreAction(
       const batch = writeBatch(db);
       
       const settingsFromDrive = JSON.parse(result.settingsData);
-      // Ensure all BenefitSettings fields are present or defaulted if necessary for Firestore
       const completeSettings: BenefitSettings = {
-        monthlyAllowance: settingsFromDrive.monthlyAllowance || 0,
-        discountPercentage: settingsFromDrive.discountPercentage || 0,
-        alertThresholdPercentage: settingsFromDrive.alertThresholdPercentage || 0,
-        autoBackupToDrive: settingsFromDrive.autoBackupToDrive || false,
-        lastBackupTimestamp: settingsFromDrive.lastBackupTimestamp || Date.now(), // Set to now if missing
-        enableEndOfMonthReminder: settingsFromDrive.enableEndOfMonthReminder || false,
-        daysBeforeEndOfMonthToRemind: settingsFromDrive.daysBeforeEndOfMonthToRemind || 3,
-        lastEndOfMonthReminderShownForMonth: settingsFromDrive.lastEndOfMonthReminderShownForMonth || null,
-        // lastLocalSaveTimestamp is not part of Firestore data
+        monthlyAllowance: typeof settingsFromDrive.monthlyAllowance === 'number' ? settingsFromDrive.monthlyAllowance : DEFAULT_BENEFIT_SETTINGS.monthlyAllowance,
+        discountPercentage: typeof settingsFromDrive.discountPercentage === 'number' ? settingsFromDrive.discountPercentage : DEFAULT_BENEFIT_SETTINGS.discountPercentage,
+        alertThresholdPercentage: typeof settingsFromDrive.alertThresholdPercentage === 'number' ? settingsFromDrive.alertThresholdPercentage : DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage,
+        autoBackupToDrive: typeof settingsFromDrive.autoBackupToDrive === 'boolean' ? settingsFromDrive.autoBackupToDrive : DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive,
+        lastBackupTimestamp: typeof settingsFromDrive.lastBackupTimestamp === 'number' ? settingsFromDrive.lastBackupTimestamp : Date.now(),
+        enableEndOfMonthReminder: typeof settingsFromDrive.enableEndOfMonthReminder === 'boolean' ? settingsFromDrive.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder,
+        daysBeforeEndOfMonthToRemind: typeof settingsFromDrive.daysBeforeEndOfMonthToRemind === 'number' ? settingsFromDrive.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind,
+        lastEndOfMonthReminderShownForMonth: settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null ? null : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
       };
       batch.set(doc(db, "users", userId, "settings", "main"), completeSettings);
 
       const purchasesCol = collection(db, "users", userId, "purchases");
       const existingPurchases = await getDocs(purchasesCol);
       existingPurchases.forEach(d => batch.delete(d.ref));
-      JSON.parse(result.purchasesData).forEach((p: any) => { // Use 'any' for flexibility from backup
+      JSON.parse(result.purchasesData).forEach((p: any) => { 
           const { id, ...purchaseItemData } = p;
-          const docRef = id ? doc(purchasesCol, id) : doc(purchasesCol); // Generate new ID if missing
+          const docRef = id ? doc(purchasesCol, id) : doc(purchasesCol); 
           batch.set(docRef, purchaseItemData);
       });
       
       const merchantsCol = collection(db, "users", userId, "merchants");
       const existingMerchants = await getDocs(merchantsCol);
       existingMerchants.forEach(d => batch.delete(d.ref));
-      JSON.parse(result.merchantsData).forEach((m: any) => { // Use 'any' for flexibility from backup
+      JSON.parse(result.merchantsData).forEach((m: any) => { 
           const { id, ...merchantItemData } = m;
-          const docRef = id ? doc(merchantsCol, id) : doc(merchantsCol); // Generate new ID if missing
+          const docRef = id ? doc(merchantsCol, id) : doc(merchantsCol); 
           batch.set(docRef, merchantItemData);
       });
       
       await batch.commit();
       console.log("[Server Action] triggerGoogleDriveRestoreAction - Firestore batch write completed.");
-      revalidatePath('/', 'layout'); // Revalidate all paths
+      revalidatePath('/', 'layout'); 
     }
     return result;
   } catch (error: any) {
