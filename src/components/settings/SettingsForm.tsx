@@ -1,10 +1,8 @@
-
 "use client";
 
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { SettingsFormSchema, type SettingsFormData } from '@/lib/schemas';
-import { triggerGoogleDriveBackupAction, triggerGoogleDriveRestoreAction } from '@/lib/actions';
 import { useAppDispatch, useAppState } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -193,30 +191,23 @@ export function SettingsForm() {
   const handleGoogleDriveBackup = async () => {
     if (!user || !user.uid || !user.email || !accessToken) { toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google.", variant: "destructive" }); return; }
     setIsBackingUpToDrive(true);
-    try {
-      const result = await triggerGoogleDriveBackupAction(user.uid, user.email, JSON.stringify(purchases), JSON.stringify(merchants), JSON.stringify(settings), accessToken);
-      if (result.success) toast({ title: "Backup a Drive Exitoso", description: result.message });
-      else toast({ title: "Error de Backup a Drive", description: result.message, variant: "destructive" });
-    } catch (error: any) { toast({ title: "Error de Backup a Drive", description: error.message || "Error inesperado.", variant: "destructive" });
-    } finally { setIsBackingUpToDrive(false); }
+    toast({
+        title: "Función Deshabilitada",
+        description: "El backup a Google Drive está temporalmente deshabilitado.",
+        variant: "destructive"
+    });
+    setIsBackingUpToDrive(false);
   };
 
   const handleGoogleDriveRestore = async () => {
     if (!user || !user.uid || !user.email || !accessToken) { toast({ title: "Autenticación Requerida", description: "Debes iniciar sesión con Google.", variant: "destructive" }); return; }
     setIsRestoringFromDrive(true);
-    try {
-      const result = await triggerGoogleDriveRestoreAction(user.uid, user.email, accessToken);
-      if (result.success) {
-        // The restoreFromDriveInStore function in the store will be called by onSnapshot reacting to Firestore changes
-        // So, we don't need to call it directly here if the server action updated Firestore.
-        // However, the server action for restore *does* return the data.
-        // For now, the store's restoreFromDrive is a no-op if user is logged in as onSnapshot handles it.
-        // If it were to apply local state changes, it would be:
-        // restoreFromDriveInStore(result.purchasesData, result.merchantsData, result.settingsData);
-        toast({ title: "Restauración desde Drive Exitosa", description: result.message });
-      } else { toast({ title: "Error de Restauración desde Drive", description: result.message || "No se encontraron datos o error.", variant: "destructive" }); }
-    } catch (error: any) { toast({ title: "Error de Restauración desde Drive", description: error.message || "Error inesperado.", variant: "destructive" });
-    } finally { setIsRestoringFromDrive(false); }
+    toast({
+        title: "Función Deshabilitada",
+        description: "La restauración desde Google Drive está temporalmente deshabilitada.",
+        variant: "destructive"
+    });
+    setIsRestoringFromDrive(false);
   };
 
   const handleSwitchChange = async (field: keyof Pick<BenefitSettings, "enableEndOfMonthReminder" | "autoBackupToDrive">, checked: boolean) => {
