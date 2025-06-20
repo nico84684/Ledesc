@@ -1,9 +1,10 @@
 
 import type { NextConfig } from 'next';
-import withPWAInit from '@ducanh2912/next-pwa';
+// import withPWAInit from '@ducanh2912/next-pwa'; // Deshabilitado temporalmente
 import path from 'path'; // Import path
 
 // Define the runtimeCaching configuration with explicit types for its content
+/* Deshabilitado temporalmente
 const runtimeCachingEntries = [
   {
     urlPattern: /^https:\/\/placehold\.co\/.*/i,
@@ -104,6 +105,7 @@ const pwaConfig = {
 };
 
 const withPWA = withPWAInit(pwaConfig);
+*/
 
 const nextConfig: NextConfig = {
   typescript: {
@@ -134,4 +136,5 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+// export default withPWA(nextConfig); // Deshabilitado temporalmente
+export default nextConfig;
