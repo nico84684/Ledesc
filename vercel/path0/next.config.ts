@@ -1,9 +1,10 @@
 
 import type { NextConfig } from 'next';
-import withPWAInit from '@ducanh2912/next-pwa';
+// import withPWAInit from '@ducanh2912/next-pwa'; // Deshabilitado temporalmente
 import path from 'path'; // Import path
 
 // Define the runtimeCaching configuration with explicit types for its content
+/* Deshabilitado temporalmente
 const runtimeCachingEntries = [
   {
     urlPattern: /^https:\/\/placehold\.co\/.*/i,
@@ -64,7 +65,9 @@ const runtimeCachingEntries = [
     },
   },
 ];
+*/
 
+/* Deshabilitado temporalmente
 const pwaConfig = {
   dest: 'public',
   disable: process.env.NODE_ENV === 'development', // Deshabilitar PWA en desarrollo
@@ -102,8 +105,9 @@ const pwaConfig = {
     ],
   },
 };
+*/
 
-const withPWA = withPWAInit(pwaConfig);
+// const withPWA = withPWAInit(pwaConfig); // Deshabilitado temporalmente
 
 const baseNextConfig: NextConfig = {
   typescript: {
@@ -134,4 +138,5 @@ const baseNextConfig: NextConfig = {
   },
 };
 
-export default withPWA(baseNextConfig);
+// export default withPWA(baseNextConfig); // Deshabilitado temporalmente
+export default baseNextConfig;
