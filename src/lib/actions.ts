@@ -5,8 +5,8 @@
 import type { PurchaseFormData, AddMerchantFormData, ContactFormData } from '@/lib/schemas';
 import type { Purchase, BenefitSettings, Merchant } from '@/types';
 import { revalidatePath } from 'next/cache';
-import type { DriveBackupInput, DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
-import type { DriveRestoreInput, DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
+// import type { DriveBackupInput, DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
+// import type { DriveRestoreInput, DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
 import { APP_NAME, DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, writeBatch, query, where, deleteDoc, orderBy } from "firebase/firestore";
 import { ensureFirebaseInitialized } from '@/lib/firebase';
@@ -227,29 +227,13 @@ export async function addManualMerchantAction(userId: string, data: AddMerchantF
   }
 }
 
+/*
 export async function triggerGoogleDriveBackupAction(
   userId: string, userEmail: string, purchasesData: string, merchantsData: string, settingsData: string, accessToken?: string
 ): Promise<DriveBackupOutput> {
   // Temporarily disabled for debugging
   console.warn("triggerGoogleDriveBackupAction is temporarily disabled.");
   return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
-  /*
-  if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
-  console.log("[Server Action] triggerGoogleDriveBackupAction called for userID:", userId);
-  try {
-    const { backupDataToDrive } = await import('@/ai/flows/driveBackupFlow');
-    const result = await backupDataToDrive({ userId, userEmail, purchasesData, merchantsData, settingsData, accessToken });
-    if (result.success) {
-      const db = await getDbInstance();
-      await setDoc(doc(db, "users", userId, "settings", "main"), { lastBackupTimestamp: Date.now() }, { merge: true });
-      console.log("[Server Action] triggerGoogleDriveBackupAction - Updated lastBackupTimestamp in Firestore.");
-    }
-    return result;
-  } catch (error: any) {
-    console.error("[Server Action] triggerGoogleDriveBackupAction Error:", error);
-    return { success: false, message: error.message || "Fallo en triggerGoogleDriveBackupAction." };
-  }
-  */
 }
 
 export async function triggerGoogleDriveRestoreAction(
@@ -258,59 +242,8 @@ export async function triggerGoogleDriveRestoreAction(
   // Temporarily disabled for debugging
   console.warn("triggerGoogleDriveRestoreAction is temporarily disabled.");
   return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
-  /*
-  if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
-  console.log("[Server Action] triggerGoogleDriveRestoreAction called for userID:", userId);
-  try {
-    const { restoreDataFromDrive } = await import('@/ai/flows/restoreDataFromDriveFlow');
-    const result = await restoreDataFromDrive({ userId, userEmail, accessToken });
-    if (result.success && result.purchasesData && result.merchantsData && result.settingsData) {
-      console.log("[Server Action] triggerGoogleDriveRestoreAction - Data received from Drive, preparing Firestore batch write.");
-      const db = await getDbInstance();
-      const batch = writeBatch(db);
-      
-      const settingsFromDrive = JSON.parse(result.settingsData);
-      const completeSettings: BenefitSettings = {
-        monthlyAllowance: typeof settingsFromDrive.monthlyAllowance === 'number' ? settingsFromDrive.monthlyAllowance : DEFAULT_BENEFIT_SETTINGS.monthlyAllowance,
-        discountPercentage: typeof settingsFromDrive.discountPercentage === 'number' ? settingsFromDrive.discountPercentage : DEFAULT_BENEFIT_SETTINGS.discountPercentage,
-        alertThresholdPercentage: typeof settingsFromDrive.alertThresholdPercentage === 'number' ? settingsFromDrive.alertThresholdPercentage : DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage,
-        autoBackupToDrive: typeof settingsFromDrive.autoBackupToDrive === 'boolean' ? settingsFromDrive.autoBackupToDrive : DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive,
-        lastBackupTimestamp: typeof settingsFromDrive.lastBackupTimestamp === 'number' ? settingsFromDrive.lastBackupTimestamp : Date.now(),
-        enableEndOfMonthReminder: typeof settingsFromDrive.enableEndOfMonthReminder === 'boolean' ? settingsFromDrive.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder,
-        daysBeforeEndOfMonthToRemind: typeof settingsFromDrive.daysBeforeEndOfMonthToRemind === 'number' ? settingsFromDrive.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind,
-        lastEndOfMonthReminderShownForMonth: settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null ? undefined : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
-      };
-      batch.set(doc(db, "users", userId, "settings", "main"), completeSettings);
-
-      const purchasesCol = collection(db, "users", userId, "purchases");
-      const existingPurchases = await getDocs(purchasesCol);
-      existingPurchases.forEach(d => batch.delete(d.ref));
-      JSON.parse(result.purchasesData).forEach((p: any) => { 
-          const { id, ...purchaseItemData } = p;
-          const docRef = id ? doc(purchasesCol, id) : doc(purchasesCol); 
-          batch.set(docRef, purchaseItemData);
-      });
-      
-      const merchantsCol = collection(db, "users", userId, "merchants");
-      const existingMerchants = await getDocs(merchantsCol);
-      existingMerchants.forEach(d => batch.delete(d.ref));
-      JSON.parse(result.merchantsData).forEach((m: any) => { 
-          const { id, ...merchantItemData } = m;
-          const docRef = id ? doc(merchantsCol, id) : doc(merchantsCol); 
-          batch.set(docRef, merchantItemData);
-      });
-      
-      await batch.commit();
-      console.log("[Server Action] triggerGoogleDriveRestoreAction - Firestore batch write completed.");
-      revalidatePath('/', 'layout'); 
-    }
-    return result;
-  } catch (error: any) {
-    console.error("[Server Action] triggerGoogleDriveRestoreAction Error:", error);
-    return { success: false, message: error.message || "Fallo en triggerGoogleDriveRestoreAction." };
-  }
-  */
 }
+*/
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
   const targetEmail = "nicolas.s.fernandez@gmail.com";
