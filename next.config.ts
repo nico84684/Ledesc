@@ -10,7 +10,6 @@ const withPWA = withPWAInit({
   cacheOnFrontEndNav: true,
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  swcMinify: true,
   workboxOptions: {
     disableDevLogs: true,
     skipWaiting: true,
@@ -101,6 +100,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig: NextConfig = {
+  swcMinify: true,
   typescript: {
     ignoreBuildErrors: false,
   },
