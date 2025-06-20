@@ -10,7 +10,7 @@ import { format, parseISO, isValid, getDaysInMonth, getDate, isSameMonth } from 
 import { es } from 'date-fns/locale';
 import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
-import { triggerGoogleDriveBackupAction } from '@/lib/actions';
+// import { triggerGoogleDriveBackupAction } from '@/lib/actions'; // Comentado para evitar el crash del servidor
 import { useAuth } from '@/components/layout/Providers';
 import { ensureFirebaseInitialized } from '@/lib/firebase';
 import { doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, writeBatch, onSnapshot, query, orderBy, where, type Firestore } from "firebase/firestore";
@@ -191,6 +191,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [user, toast]);
 
+  /* // Lógica de Auto-Backup deshabilitada para prevenir crashes del servidor
   const handleAutoBackup = useCallback(async () => {
     if (!state.settings.autoBackupToDrive || !user || !user.uid || !user.email || !accessToken) return;
     const { db: firestoreDb } = ensureFirebaseInitialized();
@@ -221,6 +222,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     previousPurchasesRef.current = state.purchases;
     previousMerchantsRef.current = state.merchants;
   }, [state.purchases, state.merchants, state.settings.autoBackupToDrive, isInitialized, user, handleAutoBackup]);
+  */
 
   useEffect(() => {
     if (!isInitialized || !state.settings.enableEndOfMonthReminder || isFirestoreLoading ) return;
@@ -514,5 +516,6 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
 
 
