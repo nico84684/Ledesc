@@ -230,6 +230,10 @@ export async function addManualMerchantAction(userId: string, data: AddMerchantF
 export async function triggerGoogleDriveBackupAction(
   userId: string, userEmail: string, purchasesData: string, merchantsData: string, settingsData: string, accessToken?: string
 ): Promise<DriveBackupOutput> {
+  // Temporarily disabled for debugging
+  console.warn("triggerGoogleDriveBackupAction is temporarily disabled.");
+  return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
+  /*
   if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
   console.log("[Server Action] triggerGoogleDriveBackupAction called for userID:", userId);
   try {
@@ -245,11 +249,16 @@ export async function triggerGoogleDriveBackupAction(
     console.error("[Server Action] triggerGoogleDriveBackupAction Error:", error);
     return { success: false, message: error.message || "Fallo en triggerGoogleDriveBackupAction." };
   }
+  */
 }
 
 export async function triggerGoogleDriveRestoreAction(
   userId: string, userEmail: string, accessToken?: string
 ): Promise<DriveRestoreOutput> {
+  // Temporarily disabled for debugging
+  console.warn("triggerGoogleDriveRestoreAction is temporarily disabled.");
+  return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
+  /*
   if (!userId || !userEmail || !accessToken) return { success: false, message: "Autenticación o token de acceso faltante." };
   console.log("[Server Action] triggerGoogleDriveRestoreAction called for userID:", userId);
   try {
@@ -300,6 +309,7 @@ export async function triggerGoogleDriveRestoreAction(
     console.error("[Server Action] triggerGoogleDriveRestoreAction Error:", error);
     return { success: false, message: error.message || "Fallo en triggerGoogleDriveRestoreAction." };
   }
+  */
 }
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
