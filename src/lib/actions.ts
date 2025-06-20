@@ -135,30 +135,33 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
 
   const settingsToSave: { [key: string]: any } = {};
 
+  // Campos numéricos requeridos
   settingsToSave.monthlyAllowance = typeof data.monthlyAllowance === 'number' ? data.monthlyAllowance : DEFAULT_BENEFIT_SETTINGS.monthlyAllowance;
   settingsToSave.discountPercentage = typeof data.discountPercentage === 'number' ? data.discountPercentage : DEFAULT_BENEFIT_SETTINGS.discountPercentage;
   settingsToSave.alertThresholdPercentage = typeof data.alertThresholdPercentage === 'number' ? data.alertThresholdPercentage : DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage;
   settingsToSave.daysBeforeEndOfMonthToRemind = typeof data.daysBeforeEndOfMonthToRemind === 'number' ? data.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind;
   
+  // Campos booleanos requeridos
   settingsToSave.autoBackupToDrive = typeof data.autoBackupToDrive === 'boolean' ? data.autoBackupToDrive : DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive;
   settingsToSave.enableEndOfMonthReminder = typeof data.enableEndOfMonthReminder === 'boolean' ? data.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder;
   
-  // lastBackupTimestamp should be a number (epoch) or can be omitted if not set.
-  // Firestore can also handle serverTimestamps, but for this, number is fine.
+  // Campos opcionales
   settingsToSave.lastBackupTimestamp = typeof data.lastBackupTimestamp === 'number' ? data.lastBackupTimestamp : 0;
-
-  // lastEndOfMonthReminderShownForMonth is a string or null
-  if (data.lastEndOfMonthReminderShownForMonth === undefined || data.lastEndOfMonthReminderShownForMonth === null) {
-    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
-  } else if (typeof data.lastEndOfMonthReminderShownForMonth === 'string') {
+  
+  if (typeof data.lastEndOfMonthReminderShownForMonth === 'string') {
     settingsToSave.lastEndOfMonthReminderShownForMonth = data.lastEndOfMonthReminderShownForMonth;
+  } else if (data.lastEndOfMonthReminderShownForMonth === null) {
+    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
   } else {
-     // If it's some other type, default to null to avoid Firestore errors
+    // Si es undefined o cualquier otro tipo, no lo incluimos explícitamente,
+    // o lo establecemos a null si la lógica de la aplicación lo prefiere así.
+    // Firestore maneja bien la omisión de campos con merge:true si no se quieren modificar.
+    // Para ser explícito, si no es una cadena, y no es explícitamente null, lo trataremos como null para almacenarlo.
     settingsToSave.lastEndOfMonthReminderShownForMonth = null;
   }
-  // lastLocalSaveTimestamp is client-side only and not saved to Firestore for authenticated users.
+  // lastLocalSaveTimestamp es solo para uso local del cliente no autenticado, no se guarda en Firestore aquí.
 
-  console.log("[Server Action] updateSettingsAction - Prepared settingsToSave for Firestore:", JSON.stringify(settingsToSave, null, 2));
+  console.log("[Server Action] updateSettingsAction - Object to be saved to Firestore:", JSON.stringify(settingsToSave, null, 2));
 
   try {
     const settingsDocRef = doc(db, "users", userId, "settings", "main");
@@ -167,12 +170,21 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
     console.log("[Server Action] updateSettingsAction: Firestore setDoc successful.");
     revalidatePath('/');
     revalidatePath('/settings');
-    // Return the full 'data' (BenefitSettings type) that was intended to be saved,
-    // as onSnapshot will eventually provide the true state from Firestore.
+    // Devuelve el objeto 'data' original que se pasó a la acción,
+    // ya que onSnapshot se encargará de actualizar el estado del cliente con los datos reales de Firestore.
     return { success: true, message: "Configuración actualizada en Firestore.", settings: data };
   } catch (error: any) {
-    console.error("[Server Action] updateSettingsAction Firestore Error:", error, "Stack:", error.stack);
-    return { success: false, message: `Error al actualizar configuración en Firestore: ${error.message}` };
+    console.error(
+        "[Server Action] updateSettingsAction Firestore Error:", 
+        error.message, 
+        "Code:", error.code, 
+        "Details:", error.details, 
+        "Stack:", error.stack
+    );
+    return { 
+        success: false, 
+        message: `Error al actualizar configuración en Firestore: ${error.message}${error.code ? ` (Código: ${error.code})` : ''}` 
+    };
   }
 }
 
@@ -321,3 +333,4 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
     return { success: false, message: "Ocurrió un error inesperado al intentar enviar el mensaje." };
   }
 }
+
