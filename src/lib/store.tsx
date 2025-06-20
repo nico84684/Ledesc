@@ -106,8 +106,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
           try {
             await Promise.all([getDoc(settingsDocRef), getDocs(purchasesQuery), getDocs(merchantsQuery)]);
-          } catch (error) { console.error("[AppStore] Error during initial Firestore batch load:", error);
-          } finally { setIsFirestoreLoading(false); setIsInitialized(true); }
+          } catch (error: any) {
+            console.error("[AppStore] Error during initial Firestore batch load:", error);
+            // Display a user-friendly toast for persistent connection issues
+            if (error.code === 'unavailable' || (error.message && error.message.includes('offline'))) {
+               toast({
+                title: 'Error de Conexión con Firestore',
+                description: 'No se pudieron cargar los datos. Esto puede deberse a un problema de red o a la configuración de tu proyecto Firebase (verifica que la API de Firestore esté habilitada y que tu clave de API no tenga restricciones de dominio).',
+                variant: 'destructive',
+                duration: 20000,
+              });
+            }
+          } finally { 
+            setIsFirestoreLoading(false);
+            setIsInitialized(true); 
+          }
 
         } else {
           // console.log("[AppStore] No authenticated user or Firestore DB not ready. Loading from localStorage.");
@@ -146,7 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (isInitialized && !user && typeof window !== 'undefined' && isMounted.current) {
       // console.log("[AppStore Persist Local] Saving state to localStorage when user is not logged in.");
       try {
-        const settingsForLocalStorage = { ...state.settings, lastLocalSaveTimestamp: Date.now() };
+        const settingsForLocalStorage = { ...state.settings };
         localStorage.setItem(LOCAL_STORAGE_SETTINGS_KEY, JSON.stringify(settingsForLocalStorage));
         localStorage.setItem(LOCAL_STORAGE_PURCHASES_KEY, JSON.stringify(state.purchases));
         localStorage.setItem(LOCAL_STORAGE_MERCHANTS_KEY, JSON.stringify(state.merchants));
@@ -501,4 +514,5 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
 
