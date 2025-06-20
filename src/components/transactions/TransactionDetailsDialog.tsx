@@ -5,20 +5,16 @@ import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import type { Purchase } from '@/types';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { CalendarDays, Store, MapPin, Tag, MessageSquareText, Receipt, DollarSign, Percent, FileText } from 'lucide-react';
+import { formatCurrencyARS, formatDateSafe } from '@/lib/utils'; // Use new utility
+import { CalendarDays, Store, MapPin, MessageSquareText, Receipt, DollarSign, Percent, FileText } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { es } from 'date-fns/locale';
 
 interface TransactionDetailsDialogProps {
   purchase: Purchase;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
-};
 
 export function TransactionDetailsDialog({ purchase, isOpen, onOpenChange }: TransactionDetailsDialogProps) {
   if (!purchase) return null;
@@ -53,7 +49,7 @@ export function TransactionDetailsDialog({ purchase, isOpen, onOpenChange }: Tra
             <div className="flex items-center">
               <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
               <span className="font-semibold mr-1">Fecha:</span>
-              <span>{format(parseISO(purchase.date), "dd 'de' MMMM 'de' yyyy, HH:mm", { locale: es })}</span>
+              <span>{formatDateSafe(purchase.date, "dd 'de' MMMM 'de' yyyy, HH:mm", es)}</span>
             </div>
           </div>
 
@@ -63,15 +59,15 @@ export function TransactionDetailsDialog({ purchase, isOpen, onOpenChange }: Tra
              <h4 className="font-medium text-sm text-muted-foreground mb-2">Información del Monto:</h4>
             <div className="flex justify-between items-center text-sm">
               <span className="flex items-center"><DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />Monto Original:</span>
-              <span>{formatCurrency(purchase.amount)}</span>
+              <span>{formatCurrencyARS(purchase.amount)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="flex items-center"><Percent className="h-4 w-4 mr-1 text-muted-foreground" />Descuento Aplicado:</span>
-              <span className="text-green-600 dark:text-green-400">-{formatCurrency(purchase.discountApplied)}</span>
+              <span className="text-green-600 dark:text-green-400">-{formatCurrencyARS(purchase.discountApplied)}</span>
             </div>
             <div className="flex justify-between items-center text-md font-semibold">
               <span className="flex items-center"><DollarSign className="h-4 w-4 mr-1 text-primary" />Monto Final:</span>
-              <span>{formatCurrency(purchase.finalAmount)}</span>
+              <span>{formatCurrencyARS(purchase.finalAmount)}</span>
             </div>
           </div>
 

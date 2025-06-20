@@ -8,9 +8,9 @@ import { Progress } from '@/components/ui/progress';
 import { DollarSign, PieChart, TrendingUp, CalendarClock } from 'lucide-react';
 import { format, parseISO, isSameMonth, getDaysInMonth, getDate } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsMobile } from '@/hooks/use-mobile'; // Corrected import path
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrencyARS, formatDateSafe } from '@/lib/utils'; // Import formatCurrencyARS
 
 interface ClientCalculatedData {
   formattedMonthYear: string;
@@ -36,7 +36,13 @@ export function BenefitUsageSummary() {
     const currentMonthDate = new Date();
     
     const totalSpent = purchases
-      .filter(p => isSameMonth(parseISO(p.date), currentMonthDate))
+      .filter(p => {
+          try {
+            return isSameMonth(parseISO(p.date), currentMonthDate);
+          } catch {
+            return false;
+          }
+      })
       .reduce((sum, p) => sum + p.finalAmount, 0);
     
     const balance = Math.max(0, settings.monthlyAllowance - totalSpent);
@@ -47,7 +53,7 @@ export function BenefitUsageSummary() {
     const daysLeft = daysInMonth - currentDayOfMonth;
 
     setClientData({
-      formattedMonthYear: format(currentMonthDate, "MMMM yyyy", { locale: es }),
+      formattedMonthYear: formatDateSafe(currentMonthDate.toISOString(), "MMMM yyyy", es),
       totalSpentThisMonth: totalSpent,
       remainingBalance: balance,
       percentageUsed: percentUsed,
@@ -56,9 +62,6 @@ export function BenefitUsageSummary() {
 
   }, [purchases, settings, isAppStoreInitialized]);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
-  };
 
   if (!isAppStoreInitialized || !clientData) {
     return (
@@ -97,7 +100,7 @@ export function BenefitUsageSummary() {
               <DollarSign className={cn("h-5 w-5", "text-[hsl(var(--indicator-spent-text-light))] dark:text-[hsl(var(--indicator-spent-text-dark))]")} />
             </div>
             <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-spent-text-light))] dark:text-[hsl(var(--indicator-spent-text-dark))]")}>
-              {formatCurrency(clientData.totalSpentThisMonth)}
+              {formatCurrencyARS(clientData.totalSpentThisMonth)}
             </p>
           </div>
 
@@ -113,7 +116,7 @@ export function BenefitUsageSummary() {
               <PieChart className={cn("h-5 w-5", "text-[hsl(var(--indicator-remaining-text-light))] dark:text-[hsl(var(--indicator-remaining-text-dark))]")} />
             </div>
             <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-remaining-text-light))] dark:text-[hsl(var(--indicator-remaining-text-dark))]")}>
-              {formatCurrency(clientData.remainingBalance)}
+              {formatCurrencyARS(clientData.remainingBalance)}
             </p>
           </div>
           
@@ -129,7 +132,7 @@ export function BenefitUsageSummary() {
               <TrendingUp className={cn("h-5 w-5", "text-[hsl(var(--indicator-total-text-light))] dark:text-[hsl(var(--indicator-total-text-dark))]")} />
             </div>
             <p className={cn("text-2xl font-bold", "text-[hsl(var(--indicator-total-text-light))] dark:text-[hsl(var(--indicator-total-text-dark))]")}>
-              {formatCurrency(settings.monthlyAllowance)}
+              {formatCurrencyARS(settings.monthlyAllowance)}
             </p>
           </div>
         </div>

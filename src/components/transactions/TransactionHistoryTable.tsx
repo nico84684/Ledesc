@@ -8,17 +8,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { Input } from '@/components/ui/input';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Download, FilterX, CalendarDays, Store, Tag, Edit3, Eye, Trash2, Loader2 } from 'lucide-react'; 
+import { Download, FilterX, CalendarDays, Store, Tag, Loader2 } from 'lucide-react'; 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { Label } from '@/components/ui/label';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { EditPurchaseDialog } from '@/components/purchases/EditPurchaseDialog';
 import { TransactionDetailsDialog } from './TransactionDetailsDialog'; 
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrencyARS, formatDateSafe } from '@/lib/utils';
+import { TransactionRow } from './TransactionRow'; // Import the new component
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,8 +37,8 @@ const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
 
 export function TransactionHistoryTable() {
-  const { purchases, settings } = useAppState(); // purchases ahora vienen de Firestore via onSnapshot
-  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStoreAndFirestore } = useAppDispatch(); // Renombrado para claridad
+  const { purchases, settings } = useAppState();
+  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStoreAndFirestore } = useAppDispatch();
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -58,19 +59,37 @@ export function TransactionHistoryTable() {
 
   const uniqueMonths = useMemo(() => {
     const months = new Set<string>();
-    purchases.forEach(p => months.add(format(parseISO(p.date), 'yyyy-MM')));
+    purchases.forEach(p => {
+      try {
+        months.add(format(parseISO(p.date), 'yyyy-MM'));
+      } catch (error) {
+        console.warn(`Invalid date format for purchase ID ${p.id}: ${p.date}`);
+      }
+    });
     return Array.from(months).sort((a, b) => b.localeCompare(a));
   }, [purchases]);
 
 
   const filteredPurchases = useMemo(() => {
     return purchases.filter(p => {
-      const purchaseDate = parseISO(p.date);
+      let purchaseDate;
+      try {
+        purchaseDate = parseISO(p.date);
+        if (isNaN(purchaseDate.getTime())) throw new Error('Invalid date');
+      } catch {
+        return false; // Skip invalid date entries
+      }
       const matchesMonth = filterMonth ? format(purchaseDate, 'yyyy-MM') === filterMonth : true;
       const matchesMerchant = filterMerchant ? p.merchantName.toLowerCase().includes(filterMerchant.toLowerCase()) : true;
       const matchesAmount = filterAmount ? p.finalAmount >= parseFloat(filterAmount) : true;
       return matchesMonth && matchesMerchant && matchesAmount;
-    }).sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime()); // Ya ordenadas por Firestore, pero re-ordenar por si acaso o si el filtro cambia el orden.
+    }).sort((a, b) => {
+        try {
+            return parseISO(b.date).getTime() - parseISO(a.date).getTime();
+        } catch {
+            return 0;
+        }
+    });
   }, [purchases, filterMonth, filterMerchant, filterAmount]);
 
   const paginatedPurchases = useMemo(() => {
@@ -87,10 +106,6 @@ export function TransactionHistoryTable() {
     setCurrentPage(1);
   };
   
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' }).format(amount);
-  };
-
   const handleEditClick = (purchase: Purchase) => {
     if (!user) {
         toast({title: "Acción no permitida", description: "Debes iniciar sesión para editar compras.", variant: "destructive"});
@@ -110,7 +125,6 @@ export function TransactionHistoryTable() {
         toast({title: "Acción no permitida", description: "Debes iniciar sesión para eliminar compras.", variant: "destructive"});
         return;
     }
-    console.log(`[TransactionHistoryTable] handleDeleteClick called for ID: ${purchase.id}`);
     setSelectedPurchaseForDelete(purchase);
   };
 
@@ -120,17 +134,10 @@ export function TransactionHistoryTable() {
         return;
     }
     const purchaseIdToDelete = selectedPurchaseForDelete.id;
-    console.log(`[TransactionHistoryTable] confirmDeletePurchase called for UserID: ${user.uid}, PurchaseID: ${purchaseIdToDelete}`);
     setIsDeleting(true);
     try {
-      // La acción del servidor ahora requiere userId
       const result = await deletePurchaseAction(user.uid, purchaseIdToDelete);
-      console.log(`[TransactionHistoryTable] deletePurchaseAction result for ID ${purchaseIdToDelete}:`, result);
-
       if (result.success) {
-        // deletePurchaseFromStoreAndFirestore ahora solo actualiza el estado local si es necesario (onSnapshot debería hacerlo)
-        // o se podría quitar si confiamos 100% en onSnapshot.
-        // Por ahora, la función en el store es la que realmente llama a deleteDoc en Firestore.
         await deletePurchaseFromStoreAndFirestore(purchaseIdToDelete); 
         toast({ title: "Eliminación Exitosa", description: result.message });
       } else {
@@ -145,8 +152,7 @@ export function TransactionHistoryTable() {
     }
   };
 
-
-  if (!isInitialized) { // isInitialized del store ahora significa que Firestore está listo (o falló la carga inicial)
+  if (!isInitialized) {
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner size={48} />
@@ -178,7 +184,7 @@ export function TransactionHistoryTable() {
               <SelectItem value={ALL_MONTHS_FILTER_VALUE}>Todos los meses</SelectItem>
               {uniqueMonths.map(month => (
                 <SelectItem key={month} value={month}>
-                  {format(parseISO(`${month}-01`), 'MMMM yyyy', { locale: es })}
+                  {formatDateSafe(`${month}-01`, 'MMMM yyyy', es)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -267,68 +273,17 @@ export function TransactionHistoryTable() {
             </TableHeader>
             <TableBody>
               {paginatedPurchases.map((purchase) => (
-                <TableRow key={purchase.id} className="text-xxs sm:text-sm">
-                  <TableCell className={cellPadding}>
-                    <span className="hidden sm:inline">{format(parseISO(purchase.date), 'dd MMM yy', { locale: es })}</span>
-                    <span className="sm:hidden">{format(parseISO(purchase.date), 'dd/MM/yy', { locale: es })}</span>
-                  </TableCell>
-                  <TableCell className={cn("font-medium", cellPadding)}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="truncate block max-w-[40px] xs:max-w-[60px] sm:max-w-[150px] cursor-default">
-                          {purchase.merchantName}
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="top" align="start">
-                        <p className="max-w-xs whitespace-normal break-words">{purchase.merchantName}</p>
-                         {purchase.merchantLocation && <p className="text-xs text-muted-foreground">{purchase.merchantLocation}</p>}
-                      </TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className={cn("text-right whitespace-nowrap", cellPadding)}>{formatCurrency(purchase.amount)}</TableCell>
-                  <TableCell className={cn("text-right text-green-600 dark:text-green-400 whitespace-nowrap", cellPadding)}>-{formatCurrency(purchase.discountApplied)}</TableCell>
-                  <TableCell className={cn("text-right font-semibold whitespace-nowrap", cellPadding)}>{formatCurrency(purchase.finalAmount)}</TableCell>
-                  <TableCell className={cn("text-center", cellPadding)}>
-                    <div className="flex items-center justify-center space-x-0 md:space-x-px">
-                       <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => handleDetailsClick(purchase)}>
-                            <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Ver Detalles</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 sm:h-7 sm:w-7" onClick={() => handleEditClick(purchase)} disabled={!user}>
-                            <Edit3 className="h-3 w-3 sm:h-4 sm:w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Editar Compra</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-6 w-6 sm:h-7 sm:w-7 text-destructive hover:text-destructive" 
-                            onClick={() => handleDeleteClick(purchase)} 
-                            disabled={isDeleting && selectedPurchaseForDelete?.id === purchase.id || !user}
-                          >
-                            {isDeleting && selectedPurchaseForDelete?.id === purchase.id ? <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" /> : <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />}
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Eliminar Compra</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <TransactionRow
+                  key={purchase.id}
+                  purchase={purchase}
+                  onDetailsClick={handleDetailsClick}
+                  onEditClick={handleEditClick}
+                  onDeleteClick={handleDeleteClick}
+                  isDeleting={isDeleting}
+                  selectedPurchaseForDeleteId={selectedPurchaseForDelete ? selectedPurchaseForDelete.id : null}
+                  user={user}
+                  cellPadding={cellPadding}
+                />
               ))}
             </TableBody>
           </Table>
@@ -387,7 +342,7 @@ export function TransactionHistoryTable() {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta compra?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. La compra realizada el {format(parseISO(selectedPurchaseForDelete.date), "dd 'de' MMMM 'de' yyyy", { locale: es })} por {formatCurrency(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente de la nube.
+                Esta acción no se puede deshacer. La compra realizada el {formatDateSafe(selectedPurchaseForDelete.date, "dd 'de' MMMM 'de' yyyy")} por {formatCurrencyARS(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente de la nube.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
