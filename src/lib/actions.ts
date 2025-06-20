@@ -8,7 +8,6 @@ import { revalidatePath } from 'next/cache';
 import { backupDataToDrive, type DriveBackupInput, type DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
 import { restoreDataFromDrive, type DriveRestoreInput, type DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
 import { APP_NAME, DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
-import { Resend } from 'resend';
 import { doc, setDoc, getDoc, collection, addDoc, getDocs, writeBatch, query, where, deleteDoc, orderBy } from "firebase/firestore";
 import { ensureFirebaseInitialized } from '@/lib/firebase';
 
@@ -308,6 +307,7 @@ export async function triggerGoogleDriveRestoreAction(
 }
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
+  const { Resend } = await import('resend');
   const targetEmail = "nicolas.s.fernandez@gmail.com";
   const resendApiKey = process.env.RESEND_API_KEY;
 

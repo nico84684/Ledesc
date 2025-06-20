@@ -9,7 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { google } from 'googleapis';
 
 const DriveBackupInputSchema = z.object({
   userId: z.string().describe('The ID of the user performing the backup.'),
@@ -47,6 +46,7 @@ const _backupDataToDriveFlow = ai.defineFlow(
     outputSchema: DriveBackupOutputSchema,
   },
   async (input) => {
+    const { google } = await import('googleapis');
     console.log(`[Genkit Flow: backupDataToDriveFlow] Received backup request for user ID: ${input.userId}, Email: ${input.userEmail}`);
     if (!input.accessToken) {
         return { success: false, message: 'Critical: Access token missing within the flow execution.' };
@@ -168,4 +168,3 @@ const _backupDataToDriveFlow = ai.defineFlow(
     }
   }
 );
-

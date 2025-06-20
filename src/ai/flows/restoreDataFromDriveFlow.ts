@@ -9,7 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'genkit';
-import { google } from 'googleapis';
 
 const DriveRestoreInputSchema = z.object({
   userId: z.string().describe('The ID of the user performing the restore.'),
@@ -46,6 +45,7 @@ const _restoreDataFromDriveFlow = ai.defineFlow(
     outputSchema: DriveRestoreOutputSchema,
   },
   async (input) => {
+    const { google } = await import('googleapis');
     console.log(`[Genkit Flow: restoreDataFromDriveFlow] Received restore request for user ID: ${input.userId}, Email: ${input.userEmail}`);
     if (!input.accessToken) {
       return { success: false, message: 'Critical: Access token missing within the flow execution.' };
