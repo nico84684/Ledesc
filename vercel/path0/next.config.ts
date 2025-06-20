@@ -1,76 +1,11 @@
 
 import type { NextConfig } from 'next';
-// import withPWAInit from '@ducanh2912/next-pwa'; // Deshabilitado temporalmente
-import path from 'path'; // Import path
+import withPWAInit from '@ducanh2912/next-pwa';
+import path from 'path';
 
-// Define the runtimeCaching configuration with explicit types for its content
-/* Deshabilitado temporalmente
-const runtimeCachingEntries = [
-  {
-    urlPattern: /^https:\/\/placehold\.co\/.*/i,
-    handler: 'CacheFirst' as const,
-    options: {
-      cacheName: 'placeholder-images',
-      expiration: {
-        maxEntries: 200,
-        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
-      },
-    },
-  },
-  {
-    urlPattern: ({ request }: { request: Request }) => request.destination === 'document',
-    handler: 'NetworkFirst' as const,
-    options: {
-      cacheName: 'pages-cache-v3',
-      expiration: {
-        maxEntries: 30,
-        maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
-      },
-      networkTimeoutSeconds: 3,
-    },
-  },
-  {
-    urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
-    handler: 'CacheFirst' as const,
-    options: {
-      cacheName: 'fonts-cache',
-      expiration: {
-        maxEntries: 10,
-        maxAgeSeconds: 365 * 24 * 60 * 60, // 1 Año
-      },
-    },
-  },
-  {
-    urlPattern: /\/images\/icono-alta512\.png$/i, // Específico para icono-alta512.png en la carpeta public/images
-    handler: 'NetworkFirst' as const,
-    options: {
-      cacheName: 'app-main-icon-cache',
-      expiration: {
-        maxEntries: 5,
-        maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Día
-      },
-      networkTimeoutSeconds: 2,
-    },
-  },
-  {
-    urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
-    handler: 'NetworkFirst' as const,
-    options: {
-      cacheName: 'app-manifest-cache',
-      expiration: {
-        maxEntries: 2,
-        maxAgeSeconds: 12 * 60 * 60, // 12 Horas
-      },
-      networkTimeoutSeconds: 2,
-    },
-  },
-];
-*/
-
-/* Deshabilitado temporalmente
-const pwaConfig = {
+const withPWA = withPWAInit({
   dest: 'public',
-  disable: process.env.NODE_ENV === 'development', // Deshabilitar PWA en desarrollo
+  disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
   cacheOnFrontEndNav: true,
@@ -79,7 +14,66 @@ const pwaConfig = {
   swcMinify: true,
   workboxOptions: {
     disableDevLogs: true,
-    runtimeCaching: runtimeCachingEntries,
+    runtimeCaching: [
+        {
+          urlPattern: /^https:\/\/placehold\.co\/.*/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'placeholder-images',
+            expiration: {
+              maxEntries: 200,
+              maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
+            },
+          },
+        },
+        {
+          urlPattern: ({ request }: { request: Request }) => request.destination === 'document',
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'pages-cache-v3',
+            expiration: {
+              maxEntries: 30,
+              maxAgeSeconds: 7 * 24 * 60 * 60, // 7 Days
+            },
+            networkTimeoutSeconds: 3,
+          },
+        },
+        {
+          urlPattern: /\.(?:woff|woff2|eot|ttf|otf)$/i,
+          handler: 'CacheFirst',
+          options: {
+            cacheName: 'fonts-cache',
+            expiration: {
+              maxEntries: 10,
+              maxAgeSeconds: 365 * 24 * 60 * 60, // 1 Year
+            },
+          },
+        },
+        {
+          urlPattern: /\/images\/icono-alta512\.png$/i,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'app-main-icon-cache',
+            expiration: {
+              maxEntries: 5,
+              maxAgeSeconds: 1 * 24 * 60 * 60, // 1 Day
+            },
+            networkTimeoutSeconds: 2,
+          },
+        },
+        {
+          urlPattern: /\/manifest\.(?:json|webmanifest)$/i,
+          handler: 'NetworkFirst',
+          options: {
+            cacheName: 'app-manifest-cache',
+            expiration: {
+              maxEntries: 2,
+              maxAgeSeconds: 12 * 60 * 60, // 12 Horas
+            },
+            networkTimeoutSeconds: 2,
+          },
+        },
+    ],
   },
   manifest: {
     name: 'LEDESC',
@@ -91,25 +85,22 @@ const pwaConfig = {
     theme_color: '#73A8B8',
     icons: [
       {
-        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
+        src: '/images/icono-alta512.png',
         sizes: '192x192',
         type: 'image/png',
         purpose: 'any maskable',
       },
       {
-        src: '/images/icono-alta512.png', // Ruta actualizada a public/images
+        src: '/images/icono-alta512.png',
         sizes: '512x512',
         type: 'image/png',
         purpose: 'any maskable',
       },
     ],
   },
-};
-*/
+});
 
-// const withPWA = withPWAInit(pwaConfig); // Deshabilitado temporalmente
-
-const baseNextConfig: NextConfig = {
+const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
@@ -128,15 +119,12 @@ const baseNextConfig: NextConfig = {
     unoptimized: true,
   },
   webpack: (config, options) => {
-    // Add the @ alias explicitly
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': path.resolve(__dirname, 'src'),
     };
-    // Important: return the modified config
     return config;
   },
 };
 
-// export default withPWA(baseNextConfig); // Deshabilitado temporalmente
-export default baseNextConfig;
+export default withPWA(nextConfig);

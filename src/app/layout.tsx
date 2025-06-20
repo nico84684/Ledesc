@@ -37,11 +37,7 @@ export const metadata: Metadata = {
       { url: '/images/icono-alta512.png', sizes: '192x192' },
     ],
   },
-  // manifest: '/manifest.webmanifest', // next-pwa genera este archivo (deshabilitado temporalmente)
-  // Otros metadatos que estaban en el <head> manual:
-  // mobile-web-app-capable is generally handled by display: 'standalone' in manifest
-  // msapplication-config, msapplication-TileColor son para tiles de Windows más antiguos
-  // Si son estrictamente necesarios, se pueden añadir a metadata.other
+  manifest: '/manifest.webmanifest',
 };
 
 export const viewport: Viewport = {
