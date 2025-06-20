@@ -122,6 +122,7 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
   console.log("[Server Action] updateSettingsAction called for userID:", userId);
   console.log("[Server Action] updateSettingsAction received data:", JSON.stringify(data, null, 2));
 
+
   if (!userId) {
     console.error("[Server Action] updateSettingsAction: userId is missing.");
     return { success: false, message: "Usuario no autenticado. Esta acción requiere autenticación." };
@@ -133,33 +134,42 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
     return { success: false, message: "Error interno del servidor: Base de datos no disponible." };
   }
 
-  const settingsToSave: { [key: string]: any } = {};
+  const settingsToSave: Partial<BenefitSettings> = {};
 
-  // Campos numéricos requeridos
-  settingsToSave.monthlyAllowance = typeof data.monthlyAllowance === 'number' ? data.monthlyAllowance : DEFAULT_BENEFIT_SETTINGS.monthlyAllowance;
-  settingsToSave.discountPercentage = typeof data.discountPercentage === 'number' ? data.discountPercentage : DEFAULT_BENEFIT_SETTINGS.discountPercentage;
-  settingsToSave.alertThresholdPercentage = typeof data.alertThresholdPercentage === 'number' ? data.alertThresholdPercentage : DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage;
-  settingsToSave.daysBeforeEndOfMonthToRemind = typeof data.daysBeforeEndOfMonthToRemind === 'number' ? data.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind;
+  // Required numeric fields
+  if (typeof data.monthlyAllowance === 'number') settingsToSave.monthlyAllowance = data.monthlyAllowance;
+  else settingsToSave.monthlyAllowance = DEFAULT_BENEFIT_SETTINGS.monthlyAllowance;
+
+  if (typeof data.discountPercentage === 'number') settingsToSave.discountPercentage = data.discountPercentage;
+  else settingsToSave.discountPercentage = DEFAULT_BENEFIT_SETTINGS.discountPercentage;
+
+  if (typeof data.alertThresholdPercentage === 'number') settingsToSave.alertThresholdPercentage = data.alertThresholdPercentage;
+  else settingsToSave.alertThresholdPercentage = DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage;
   
-  // Campos booleanos requeridos
-  settingsToSave.autoBackupToDrive = typeof data.autoBackupToDrive === 'boolean' ? data.autoBackupToDrive : DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive;
-  settingsToSave.enableEndOfMonthReminder = typeof data.enableEndOfMonthReminder === 'boolean' ? data.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder;
+  if (typeof data.daysBeforeEndOfMonthToRemind === 'number') settingsToSave.daysBeforeEndOfMonthToRemind = data.daysBeforeEndOfMonthToRemind;
+  else settingsToSave.daysBeforeEndOfMonthToRemind = DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind;
+
+  // Required boolean fields
+  if (typeof data.autoBackupToDrive === 'boolean') settingsToSave.autoBackupToDrive = data.autoBackupToDrive;
+  else settingsToSave.autoBackupToDrive = DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive;
+
+  if (typeof data.enableEndOfMonthReminder === 'boolean') settingsToSave.enableEndOfMonthReminder = data.enableEndOfMonthReminder;
+  else settingsToSave.enableEndOfMonthReminder = DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder;
   
-  // Campos opcionales
-  settingsToSave.lastBackupTimestamp = typeof data.lastBackupTimestamp === 'number' ? data.lastBackupTimestamp : 0;
-  
-  if (typeof data.lastEndOfMonthReminderShownForMonth === 'string') {
+  // Optional fields
+  if (typeof data.lastBackupTimestamp === 'number') settingsToSave.lastBackupTimestamp = data.lastBackupTimestamp;
+  else settingsToSave.lastBackupTimestamp = 0; // Default to 0 if not provided or incorrect type
+
+  if (typeof data.lastEndOfMonthReminderShownForMonth === 'string' && data.lastEndOfMonthReminderShownForMonth.trim() !== '') {
     settingsToSave.lastEndOfMonthReminderShownForMonth = data.lastEndOfMonthReminderShownForMonth;
   } else if (data.lastEndOfMonthReminderShownForMonth === null) {
-    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
-  } else {
-    // Si es undefined o cualquier otro tipo, no lo incluimos explícitamente,
-    // o lo establecemos a null si la lógica de la aplicación lo prefiere así.
-    // Firestore maneja bien la omisión de campos con merge:true si no se quieren modificar.
-    // Para ser explícito, si no es una cadena, y no es explícitamente null, lo trataremos como null para almacenarlo.
-    settingsToSave.lastEndOfMonthReminderShownForMonth = null;
+     // If explicitly null, we let Firestore remove it or store it as null if the field exists
+     // For 'merge: true', omitting it is often cleaner if the intent is to not set it.
+     // However, if we want to explicitly clear it in Firestore, we might need to send null,
+     // but the type BenefitSettings suggests it's optional (string | undefined).
+     // For now, if it's null, we'll treat it as undefined by not setting it.
   }
-  // lastLocalSaveTimestamp es solo para uso local del cliente no autenticado, no se guarda en Firestore aquí.
+  // lastLocalSaveTimestamp is not saved to Firestore from this action.
 
   console.log("[Server Action] updateSettingsAction - Object to be saved to Firestore:", JSON.stringify(settingsToSave, null, 2));
 
@@ -170,9 +180,10 @@ export async function updateSettingsAction(userId: string, data: BenefitSettings
     console.log("[Server Action] updateSettingsAction: Firestore setDoc successful.");
     revalidatePath('/');
     revalidatePath('/settings');
-    // Devuelve el objeto 'data' original que se pasó a la acción,
-    // ya que onSnapshot se encargará de actualizar el estado del cliente con los datos reales de Firestore.
-    return { success: true, message: "Configuración actualizada en Firestore.", settings: data };
+    const currentSettingsDoc = await getDoc(settingsDocRef);
+    const fetchedSettings = currentSettingsDoc.exists() ? currentSettingsDoc.data() as BenefitSettings : undefined;
+    
+    return { success: true, message: "Configuración actualizada en Firestore.", settings: fetchedSettings || data };
   } catch (error: any) {
     console.error(
         "[Server Action] updateSettingsAction Firestore Error:", 
@@ -263,7 +274,7 @@ export async function triggerGoogleDriveRestoreAction(
         lastBackupTimestamp: typeof settingsFromDrive.lastBackupTimestamp === 'number' ? settingsFromDrive.lastBackupTimestamp : Date.now(),
         enableEndOfMonthReminder: typeof settingsFromDrive.enableEndOfMonthReminder === 'boolean' ? settingsFromDrive.enableEndOfMonthReminder : DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder,
         daysBeforeEndOfMonthToRemind: typeof settingsFromDrive.daysBeforeEndOfMonthToRemind === 'number' ? settingsFromDrive.daysBeforeEndOfMonthToRemind : DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind,
-        lastEndOfMonthReminderShownForMonth: settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null ? null : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
+        lastEndOfMonthReminderShownForMonth: (settingsFromDrive.lastEndOfMonthReminderShownForMonth === undefined || settingsFromDrive.lastEndOfMonthReminderShownForMonth === null) ? undefined : String(settingsFromDrive.lastEndOfMonthReminderShownForMonth),
       };
       batch.set(doc(db, "users", userId, "settings", "main"), completeSettings);
 
@@ -333,4 +344,3 @@ export async function contactFormAction(data: ContactFormData): Promise<{ succes
     return { success: false, message: "Ocurrió un error inesperado al intentar enviar el mensaje." };
   }
 }
-
