@@ -166,7 +166,8 @@ export default function HelpPage() {
                 
                 <p><strong><UserCheck className="inline h-5 w-5 text-blue-600" /> Autenticación y Sincronización en la Nube:</strong></p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                    <li>Inicia sesión con tu cuenta de Google para habilitar la sincronización automática de tus datos (compras, comercios, configuración) con tu Google Drive.</li>
+                    <li>Inicia sesión con tu cuenta de Google para habilitar la sincronización automática de tus datos con tu Google Drive.</li>
+                    <li>Utiliza el botón "Sincronizar Ahora" para guardar tus cambios en Google Drive de inmediato.</li>
                     <li>Si no inicias sesión, tus datos se guardan únicamente en el navegador y dispositivo actual.</li>
                 </ul>
 
@@ -193,7 +194,7 @@ export default function HelpPage() {
               <AccordionContent className="space-y-4 text-base pl-2">
                 <p><strong>¿Cómo se guardan mis datos si inicio sesión?</strong></p>
                 <p>
-                  Si eliges iniciar sesión con tu cuenta de Google, tus datos de la aplicación (compras, comercios y configuración) se almacenan en un **único archivo JSON** (`ledesc_app_data.json`) en la carpeta raíz de tu **Google Drive**. Esto permite las siguientes ventajas:
+                  Si eliges iniciar sesión con tu cuenta de Google, tus datos de la aplicación (compras, comercios y configuración) se almacenan en un **único archivo JSON** (`ledesc_app_data.json`) dentro de una carpeta llamada **`Ledesc Sync`** en tu **Google Drive**. Esto permite las siguientes ventajas:
                 </p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
                   <li><strong>Sincronización Automática:</strong> Cualquier cambio que hagas se guarda automáticamente en el archivo de tu Drive, permitiéndote acceder a tus datos actualizados desde cualquier dispositivo donde inicies sesión con la misma cuenta.</li>
@@ -205,7 +206,7 @@ export default function HelpPage() {
                 <p><strong><Lock className="inline h-4 w-4 text-green-600 mr-1" />Seguridad y Permisos de Google Drive:</strong></p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
                   <li>La aplicación solicita el permiso `drive.file`. Esto significa que la aplicación **solo puede acceder a los archivos que ella misma crea**.</li>
-                  <li>{APP_NAME} **no tiene acceso** a ningún otro archivo o carpeta en tu Drive, solo al archivo `ledesc_app_data.json` que crea y gestiona.</li>
+                  <li>{APP_NAME} **no tiene acceso** a ningún otro archivo o carpeta en tu Drive, solo a la carpeta `Ledesc Sync` y los archivos que ella misma crea y gestiona dentro de esa carpeta.</li>
                   <li>Tu contraseña de Google nunca es almacenada ni vista por {APP_NAME}. La autenticación se maneja de forma segura a través de los servicios de Google.</li>
                 </ul>
                 

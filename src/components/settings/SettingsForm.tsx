@@ -10,9 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Loader2, Save, AlertTriangle, FileUp, FileDown, AlertCircle, ShoppingCart, UploadCloud, DownloadCloud, RefreshCw, CalendarClock, Info } from 'lucide-react';
+import { Loader2, Save, FileUp, FileDown, Info, RefreshCw, CalendarClock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useRouter, usePathname } from 'next/navigation';
 import { Separator } from '@/components/ui/separator';
@@ -27,11 +27,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { BenefitSettings } from '@/types';
 import { useAuth } from '@/components/layout/Providers';
 import { DEFAULT_BENEFIT_SETTINGS, APP_NAME } from '@/config/constants';
+import { cn } from '@/lib/utils';
 
 const INITIAL_SETUP_COMPLETE_KEY = `initialSetupComplete_${APP_NAME}`;
 
@@ -42,6 +42,7 @@ export function SettingsForm() {
     backupToExcel,
     restoreFromExcel,
     updateSettings,
+    forceSync,
   } = useAppDispatch();
   const { user, loading: authLoading, isFirebaseAuthReady, signIn } = useAuth();
   const { toast } = useToast();
@@ -75,14 +76,14 @@ export function SettingsForm() {
         }
       }
     }
-  }, [isInitialized, settings, reset, router, pathname, user]);
+  }, [isInitialized, settings, reset, router, pathname]);
 
   async function onSubmitSettings(data: SettingsFormData) {
     setIsSubmittingSettings(true);
     let wasInitialSetupScreenBeforeSave = isInitialSetupScreen;
 
     try {
-      updateSettings(data); // This now updates local state, and a useEffect handles persistence
+      updateSettings(data);
       
       if (typeof window !== 'undefined') localStorage.setItem(INITIAL_SETUP_COMPLETE_KEY, 'true');
       setIsInitialSetupScreen(false);
@@ -112,19 +113,21 @@ export function SettingsForm() {
     } else { toast({ title: "Información", description: "No se seleccionó ningún archivo."}); }
   };
 
-  const handleSwitchChange = (field: keyof Pick<BenefitSettings, "enableEndOfMonthReminder">, checked: boolean) => {
+  const handleSwitchChange = useCallback((field: keyof Pick<typeof DEFAULT_BENEFIT_SETTINGS, "enableEndOfMonthReminder">, checked: boolean) => {
     updateSettings({ [field]: checked });
     toast({ title: "Configuración Actualizada", description: `Recordatorio fin de mes ${checked ? 'activado' : 'desactivado'}.` });
-  };
+  }, [updateSettings, toast]);
   
   if (!isInitialized || (authLoading && !isFirebaseAuthReady)) {
      return ( <div className="flex justify-center items-center h-64"> <LoadingSpinner size={48} /> <p className="ml-4 text-lg text-muted-foreground">Cargando...</p></div> );
   }
 
   const lastSyncTimestamp = settings?.lastBackupTimestamp;
-  const lastSyncDisplay = user && lastSyncTimestamp && lastSyncTimestamp > 0
-    ? `Última sincronización con Drive: ${format(new Date(lastSyncTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
-    : user ? `Pendiente de sincronización con Google Drive.` : `Los datos se guardan localmente.`;
+  const lastSyncDisplay = user
+    ? lastSyncTimestamp && lastSyncTimestamp > 0
+      ? `Última sincronización: ${format(new Date(lastSyncTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
+      : `Pendiente de sincronización con Google Drive.`
+    : `Los datos se guardan localmente.`;
 
   return (
     <div className="w-full max-w-2xl mx-auto space-y-8 pb-8">
@@ -172,12 +175,20 @@ export function SettingsForm() {
       </Card>
 
       <Card className="shadow-lg">
-        <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y restaura tus datos desde archivos Excel.</CardDescription> </CardHeader>
+        <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
         <CardContent className="space-y-6">
           <div className="p-3 border rounded-md bg-muted/50 text-sm"> 
-            <div className="flex items-center">
-              {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin" /> : <Info className="h-4 w-4 mr-2 text-primary"/>}
-              <span>{isSyncing && user ? "Sincronizando con Google Drive..." : lastSyncDisplay}</span>
+            <div className="flex items-center justify-between">
+              <div className='flex items-center'>
+                {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin" /> : <Info className="h-4 w-4 mr-2 text-primary"/>}
+                <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
+              </div>
+              {user && (
+                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing}>
+                  <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
+                  Sincronizar Ahora
+                </Button>
+              )}
             </div>
            </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -1,13 +1,17 @@
-// This file contains server actions.
-"use server";
+
+'use server';
 
 import type { AppState } from '@/types';
-import { type ContactFormData } from '@/lib/schemas';
+import type { ContactFormData } from '@/lib/schemas';
 import { google } from 'googleapis';
 import { APP_NAME } from '@/config/constants';
 
+// --- Google Drive Configuration ---
 const APP_DATA_FILENAME = 'ledesc_app_data.json';
+const APP_FOLDER_NAME = 'Ledesc Sync'; // The dedicated folder for the app
 const APP_DATA_MIME_TYPE = 'application/json';
+
+// --- Helper Functions for Google Drive ---
 
 async function getOauth2Client(accessToken: string) {
     const oauth2Client = new google.auth.OAuth2();
@@ -16,7 +20,45 @@ async function getOauth2Client(accessToken: string) {
 }
 
 /**
- * Finds the app data file in Google Drive and returns its content.
+ * Finds a folder by name and returns its ID. If not found, creates it.
+ * @param drive The authenticated Google Drive client.
+ * @param folderName The name of the folder to find or create.
+ * @returns The ID of the folder.
+ */
+async function getOrCreateFolder(drive: any, folderName: string): Promise<string | null> {
+    try {
+        // Search for the folder
+        const folderRes = await drive.files.list({
+            q: `mimeType='application/vnd.google-apps.folder' and name='${folderName}' and 'root' in parents and trashed=false`,
+            fields: 'files(id, name)',
+            spaces: 'drive',
+            pageSize: 1,
+        });
+
+        if (folderRes.data.files && folderRes.data.files.length > 0 && folderRes.data.files[0].id) {
+            return folderRes.data.files[0].id; // Folder exists
+        }
+
+        // Folder doesn't exist, create it. Note: 'resource' is the old name for 'requestBody'
+        const fileMetadata = {
+            name: folderName,
+            mimeType: 'application/vnd.google-apps.folder',
+        };
+        const newFolder = await drive.files.create({
+            requestBody: fileMetadata,
+            fields: 'id',
+        });
+        return newFolder.data.id || null;
+    } catch (error: any) {
+        console.error(`[Action] Error getting or creating folder '${folderName}':`, error.message);
+        throw new Error(`Failed to access or create the '${folderName}' folder in Google Drive.`);
+    }
+}
+
+// --- Exported Server Actions ---
+
+/**
+ * Finds the app data file in the dedicated app folder in Google Drive and returns its content.
  * @param accessToken The user's Google access token.
  * @returns An object containing the fileId and the file content (as AppState).
  */
@@ -25,8 +67,13 @@ export async function getDriveData(accessToken: string): Promise<{ fileId: strin
         const oauth2Client = await getOauth2Client(accessToken);
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
+        const folderId = await getOrCreateFolder(drive, APP_FOLDER_NAME);
+        if (!folderId) {
+            return { fileId: null, data: null, error: `Could not create or find the '${APP_FOLDER_NAME}' folder.` };
+        }
+
         const res = await drive.files.list({
-            q: `name='${APP_DATA_FILENAME}' and mimeType='${APP_DATA_MIME_TYPE}' and 'root' in parents and trashed=false`,
+            q: `name='${APP_DATA_FILENAME}' and mimeType='${APP_DATA_MIME_TYPE}' and '${folderId}' in parents and trashed=false`,
             spaces: 'drive',
             fields: 'files(id, name)',
             pageSize: 1,
@@ -37,7 +84,7 @@ export async function getDriveData(accessToken: string): Promise<{ fileId: strin
             const fileId = file.id;
 
             if (!fileId) {
-                return { fileId: null, data: null, error: 'File found but ID is missing.' };
+                return { fileId: null, data: null, error: 'File found but its ID is missing.' };
             }
 
             const fileContentRes = await drive.files.get({
@@ -62,9 +109,8 @@ export async function getDriveData(accessToken: string): Promise<{ fileId: strin
     }
 }
 
-
 /**
- * Saves the entire application state to a JSON file in Google Drive.
+ * Saves the entire application state to a JSON file in the dedicated app folder in Google Drive.
  * Creates the file if it doesn't exist (fileId is null).
  * @param accessToken The user's Google access token.
  * @param fileId The ID of the file to update. If null, a new file will be created.
@@ -105,11 +151,16 @@ export async function saveDriveData(accessToken: string, fileId: string | null, 
             });
             return { fileId: res.data.id || null, lastBackupTimestamp: timestamp };
         } else {
-            // Create new file
+            // Create new file inside the app folder
+            const folderId = await getOrCreateFolder(drive, APP_FOLDER_NAME);
+            if (!folderId) {
+                throw new Error(`Could not create or find the '${APP_FOLDER_NAME}' folder in Drive to save the file.`);
+            }
+
             const res = await drive.files.create({
                 requestBody: {
                     ...fileMetadata,
-                    parents: ['root'],
+                    parents: [folderId],
                 },
                 media: media,
                 fields: 'id',
@@ -122,7 +173,11 @@ export async function saveDriveData(accessToken: string, fileId: string | null, 
     }
 }
 
-
+/**
+ * Handles the submission of the contact form.
+ * @param data The form data.
+ * @returns A result object indicating success or failure.
+ */
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
   const targetEmail = "nicolas.s.fernandez@gmail.com";
   const resendApiKey = process.env.RESEND_API_KEY;

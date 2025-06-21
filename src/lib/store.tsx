@@ -8,7 +8,6 @@ import { DEFAULT_BENEFIT_SETTINGS, APP_NAME } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO, isValid, getDaysInMonth, getDate, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { useRouter, usePathname } from 'next/navigation';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/components/layout/Providers';
 import { getDriveData, saveDriveData } from '@/lib/actions';
@@ -23,17 +22,15 @@ interface AppDispatchContextType {
   isInitialized: boolean;
   backupToExcel: () => void;
   restoreFromExcel: (file: File) => void;
+  forceSync: () => void;
 }
 
 const AppStateContext = createContext<AppState | undefined>(undefined);
 const AppDispatchContext = createContext<AppDispatchContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_STATE_KEY = `${APP_NAME}_state_v3`;
-const INITIAL_SETUP_COMPLETE_KEY = `initialSetupComplete_${APP_NAME}`;
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const router = useRouter();
-  const pathname = usePathname();
   const { toast, dismiss } = useToast();
   const { user, accessToken, isFirebaseAuthReady } = useAuth();
   
@@ -62,7 +59,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setIsSyncing(false);
         if (error) {
           toast({ title: 'Error de Sincronización', description: `No se pudieron cargar los datos de Drive: ${error}. Usando datos locales.`, variant: 'destructive', duration: 10000 });
-          // Fallback to local storage if drive fails
           const localState = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
           if (localState) setState(JSON.parse(localState));
         } else if (data && fileId) {
@@ -71,13 +67,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
           dismiss();
           toast({ title: 'Sincronización Completa', description: 'Datos cargados desde Google Drive.', duration: 3000});
         } else {
-            // New user on Drive, load local data to upload it.
             const localState = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
             if (localState) setState(JSON.parse(localState));
             toast({ title: 'Bienvenido', description: 'Se creará un nuevo archivo de datos en tu Google Drive.' });
         }
       } else {
-        // Not logged in, load from local storage
         const localState = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
         if (localState) setState(JSON.parse(localState));
       }
@@ -87,41 +81,70 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     loadData();
   }, [user, accessToken, isFirebaseAuthReady, toast, dismiss]);
-
-  // Persist data: To Drive if logged in, otherwise to localStorage
+  
+  // Save data effect (online/offline)
   useEffect(() => {
     if (!isInitialized || !isMounted.current) {
-        if(isInitialized) isMounted.current = true;
+        if (isInitialized) isMounted.current = true;
         return;
     }
 
     if (user && accessToken) {
-      // Debounced save to Google Drive
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-      debounceTimer.current = setTimeout(async () => {
-        setIsSyncing(true);
-        const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(accessToken, driveFileId, state);
-        setIsSyncing(false);
-        if (error) {
-          toast({ title: 'Error de Sincronización', description: `No se pudieron guardar los cambios en Drive: ${error}`, variant: 'destructive' });
-        } else if (newFileId) {
-          if (!driveFileId) setDriveFileId(newFileId);
-          // Optimistically update timestamp to avoid waiting for next load
-          setState(prevState => ({...prevState, settings: {...prevState.settings, lastBackupTimestamp}}))
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(async () => {
+            if (isSyncing) return;
+            setIsSyncing(true);
+            const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(accessToken, driveFileId, state);
+            setIsSyncing(false);
+            if (error) {
+                console.error("[AutoSync] Error:", error);
+            } else {
+                if (newFileId && !driveFileId) setDriveFileId(newFileId);
+                setState(prevState => ({ ...prevState, settings: { ...prevState.settings, lastBackupTimestamp } }));
+            }
+        }, 2500);
+    } 
+    else {
+        try {
+            const timestamp = Date.now();
+            const newState = {...state, settings: {...state.settings, lastLocalSaveTimestamp: timestamp}};
+            localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(newState));
+        } catch (error) {
+            console.error("[AppStore] Failed to save state to localStorage:", error);
+            toast({ title: "Error de Guardado Local", description: "No se pudo guardar el estado.", variant: "destructive" });
         }
-      }, 2000); // 2-second debounce
-    } else {
-      // Save to local storage immediately
-      try {
-        localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(state));
-      } catch (error) {
-        console.error("[AppStore] Failed to save state to localStorage:", error);
-        toast({ title: "Error de Guardado Local", description: "No se pudo guardar el estado de la aplicación.", variant: "destructive" });
-      }
     }
-  }, [state, user, accessToken, driveFileId, isInitialized, toast]);
+    
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current) };
+  }, [state, user, accessToken, driveFileId, isInitialized, isSyncing, toast]);
+  
+  const forceSync = useCallback(async () => {
+    if (!user || !accessToken) {
+      toast({ title: "No has iniciado sesión", description: "Inicia sesión para sincronizar con Google Drive." });
+      return;
+    }
+    if (isSyncing) {
+      toast({ title: "Sincronización en Progreso", description: "Espera a que la sincronización actual termine." });
+      return;
+    }
+    
+    setIsSyncing(true);
+    toast({ title: 'Forzando Sincronización...', description: 'Guardando datos en Google Drive.' });
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-  // End of month reminder logic (unchanged)
+    const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(accessToken, driveFileId, state);
+
+    setIsSyncing(false);
+    if (error) {
+      toast({ title: 'Error de Sincronización', description: `No se pudieron guardar los cambios en Drive: ${error}`, variant: 'destructive' });
+    } else {
+      if (newFileId && !driveFileId) setDriveFileId(newFileId);
+      setState(prevState => ({ ...prevState, settings: { ...prevState.settings, lastBackupTimestamp } }));
+      toast({ title: 'Sincronización Exitosa', description: 'Tus datos se guardaron en Google Drive.', duration: 3000 });
+    }
+  }, [user, accessToken, driveFileId, state, toast, isSyncing]);
+
+  // End of month reminder logic
   useEffect(() => {
     if (!isInitialized || !state.settings.enableEndOfMonthReminder) return;
     
@@ -133,11 +156,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (daysRemainingInMonth >= 0 && daysRemainingInMonth <= state.settings.daysBeforeEndOfMonthToRemind) {
       const totalSpentThisMonth = state.purchases
         .filter(p => {
-          try {
-            return isSameMonth(parseISO(p.date), now);
-          } catch {
-            return false;
-          }
+          try { return isSameMonth(parseISO(p.date), now); } catch { return false; }
         })
         .reduce((sum, p) => sum + p.finalAmount, 0);
       const remainingBalance = Math.max(0, state.settings.monthlyAllowance - totalSpentThisMonth);
@@ -199,7 +218,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const updateSettings = useCallback((newSettingsData: Partial<BenefitSettings>) => {
     setState(prevState => ({ ...prevState, settings: { ...prevState.settings, ...newSettingsData } }));
   }, []);
-
+  
   const addMerchant = useCallback((merchantName: string, merchantLocation?: string) => {
     const trimmedName = merchantName.trim();
     const trimmedLocation = merchantLocation?.trim() || undefined;
@@ -283,7 +302,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppStateContext.Provider value={{...state, isSyncing}}>
       <AppDispatchContext.Provider value={{
         addPurchase, editPurchase, deletePurchase, updateSettings, addMerchant,
-        exportToCSV, isInitialized, backupToExcel, restoreFromExcel
+        exportToCSV, isInitialized, backupToExcel, restoreFromExcel, forceSync
       }}>
         {children}
       </AppDispatchContext.Provider>
