@@ -74,33 +74,9 @@ const withPWA = withPWAInit({
         },
     ],
   },
-  manifest: {
-    name: 'LEDESC',
-    short_name: 'LEDESC',
-    description: 'Gestiona tus beneficios gastronómicos de forma sencilla.',
-    start_url: '/',
-    display: 'standalone',
-    background_color: '#F0F4F5',
-    theme_color: '#73A8B8',
-    icons: [
-      {
-        src: '/images/icono-alta512.png',
-        sizes: '192x192',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
-      {
-        src: '/images/icono-alta512.png',
-        sizes: '512x512',
-        type: 'image/png',
-        purpose: 'any maskable',
-      },
-    ],
-  },
 });
 
 const nextConfig: NextConfig = {
-  swcMinify: true,
   typescript: {
     ignoreBuildErrors: false,
   },
