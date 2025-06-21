@@ -3,29 +3,142 @@
 
 import type { AppState } from '@/types';
 import type { ContactFormData } from '@/lib/schemas';
-// import { google } from 'googleapis'; // Temporarily disabled
 import { APP_NAME } from '@/config/constants';
 
-// --- Google Drive Functionality is temporarily disabled to troubleshoot server startup issues. ---
-// The presence of the 'googleapis' library appears to be causing silent crashes in the Vercel environment.
-// The functions below will return a "disabled" state to ensure the app remains functional.
+const DRIVE_API_URL = 'https://www.googleapis.com/drive/v3';
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3';
+const FOLDER_NAME = 'Ledesc Sync';
+const FILE_NAME = 'ledesc_app_data.json';
+
+// Helper function to find the app folder
+async function _getAppFolderId(accessToken: string): Promise<string | null> {
+    const response = await fetch(`${DRIVE_API_URL}/files?q=mimeType='application/vnd.google-apps.folder' and name='${FOLDER_NAME}' and trashed=false&spaces=drive`, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+    });
+    if (!response.ok) {
+        console.error("Drive API Error (_getAppFolderId):", await response.text());
+        return null;
+    }
+    const { files } = await response.json();
+    return files.length > 0 ? files[0].id : null;
+}
+
+// Helper function to create the app folder
+async function _createAppFolder(accessToken: string): Promise<string | null> {
+    const response = await fetch(`${DRIVE_API_URL}/files`, {
+        method: 'POST',
+        headers: { 
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            name: FOLDER_NAME,
+            mimeType: 'application/vnd.google-apps.folder'
+        }),
+    });
+    if (!response.ok) {
+        console.error("Drive API Error (_createAppFolder):", await response.text());
+        return null;
+    }
+    const folder = await response.json();
+    return folder.id;
+}
 
 /**
- * Finds the app data file in the dedicated app folder in Google Drive.
- * This function is temporarily disabled.
+ * Finds or creates the app data file in the dedicated app folder in Google Drive.
  */
 export async function getDriveData(accessToken: string): Promise<{ fileId: string | null; data: AppState | null; error?: string }> {
-    console.warn("[Action] getDriveData is temporarily disabled to troubleshoot server startup.");
-    return { fileId: null, data: null, error: "La sincronización con Google Drive está temporalmente desactivada." };
+    try {
+        const folderId = await _getAppFolderId(accessToken);
+        if (!folderId) {
+            // Folder doesn't exist, so file can't exist. This is a valid state for a new user.
+            return { fileId: null, data: null };
+        }
+
+        const fileQuery = `name='${FILE_NAME}' and '${folderId}' in parents and trashed=false`;
+        const fileSearchRes = await fetch(`${DRIVE_API_URL}/files?q=${encodeURIComponent(fileQuery)}&fields=files(id,name)&spaces=drive`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (!fileSearchRes.ok) throw new Error(`Error searching for file: ${await fileSearchRes.text()}`);
+        
+        const { files } = await fileSearchRes.json();
+        if (files.length === 0) {
+            // File doesn't exist yet. Valid for a user who has used app before folder feature.
+            return { fileId: null, data: null };
+        }
+
+        const fileId = files[0].id;
+        const fileDataRes = await fetch(`${DRIVE_API_URL}/files/${fileId}?alt=media`, {
+            headers: { Authorization: `Bearer ${accessToken}` }
+        });
+
+        if (!fileDataRes.ok) throw new Error(`Error fetching file data: ${await fileDataRes.text()}`);
+
+        const data = await fileDataRes.json() as AppState;
+        return { fileId, data };
+
+    } catch (error: any) {
+        console.error("[Action] getDriveData failed:", error.message);
+        return { fileId: null, data: null, error: "No se pudieron obtener los datos de Google Drive." };
+    }
 }
 
 /**
  * Saves the entire application state to a JSON file in Google Drive.
- * This function is temporarily disabled.
  */
 export async function saveDriveData(accessToken: string, fileId: string | null, data: AppState): Promise<{ fileId: string | null; error?: string; lastBackupTimestamp?: number }> {
-    console.warn("[Action] saveDriveData is temporarily disabled to troubleshoot server startup.");
-    return { fileId, error: "La sincronización con Google Drive está temporalmente desactivada.", lastBackupTimestamp: data.settings.lastBackupTimestamp };
+    try {
+        let folderId = await _getAppFolderId(accessToken);
+        if (!folderId) {
+            folderId = await _createAppFolder(accessToken);
+            if (!folderId) throw new Error("Could not create app folder in Drive.");
+        }
+        
+        const boundary = '-------314159265358979323846';
+        const delimiter = `\r\n--${boundary}\r\n`;
+        const close_delim = `\r\n--${boundary}--`;
+        
+        const metadata = {
+            name: FILE_NAME,
+            mimeType: 'application/json',
+            // If we are creating a new file, specify the parent folder.
+            // If updating, the parent doesn't change.
+            ...(!fileId && { parents: [folderId] })
+        };
+        
+        const updatedTimestamp = Date.now();
+        const dataToSave: AppState = { ...data, settings: { ...data.settings, lastBackupTimestamp: updatedTimestamp }};
+        const multipartRequestBody =
+            delimiter +
+            'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+            JSON.stringify(metadata) +
+            delimiter +
+            'Content-Type: application/json\r\n\r\n' +
+            JSON.stringify(dataToSave, null, 2) +
+            close_delim;
+
+        const method = fileId ? 'PATCH' : 'POST';
+        const url = `${DRIVE_UPLOAD_URL}/files${fileId ? `/${fileId}` : ''}?uploadType=multipart`;
+
+        const response = await fetch(url, {
+            method,
+            headers: {
+                Authorization: `Bearer ${accessToken}`,
+                'Content-Type': `multipart/related; boundary=${boundary}`,
+            },
+            body: multipartRequestBody,
+        });
+
+        if (!response.ok) throw new Error(`Drive save failed: ${await response.text()}`);
+        
+        const returnedFile = await response.json();
+        return { fileId: returnedFile.id, lastBackupTimestamp: updatedTimestamp };
+
+    } catch (error: any) {
+        console.error("[Action] saveDriveData failed:", error.message);
+        return { fileId, error: "No se pudieron guardar los datos en Google Drive.", lastBackupTimestamp: data.settings.lastBackupTimestamp };
+    }
 }
 
 
