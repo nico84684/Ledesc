@@ -1,3 +1,4 @@
+
 "use client"; // Asegura que AppShell y sus contextos se ejecuten en el cliente
 
 import type { ReactNode } from 'react';
@@ -24,13 +25,11 @@ export function AppShell({ children }: AppShellProps) {
           <SidebarNav />
         </Sidebar>
         <SidebarInset>
-          <div className="flex flex-col min-h-screen">
-            <Header />
-            <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
-              {children}
-            </main>
-            <Toaster />
-          </div>
+          <Header />
+          <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
+            {children}
+          </main>
+          <Toaster />
         </SidebarInset>
       </SidebarProvider>
     </AppProvider>
