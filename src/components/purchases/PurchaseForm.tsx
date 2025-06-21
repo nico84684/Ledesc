@@ -54,9 +54,11 @@ export function PurchaseForm({
     defaultValues: formDefaultValues,
   });
 
+  const { reset } = form;
+
   useEffect(() => {
     if (initialData) {
-      form.reset({
+      reset({
         amount: initialData.amount,
         date: initialData.date ? format(parseISO(initialData.date), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx") : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx"),
         merchantName: initialData.merchantName,
@@ -64,7 +66,7 @@ export function PurchaseForm({
         description: initialData.description || '',
       });
     }
-  }, [initialData, form]);
+  }, [initialData, reset]);
 
 
   async function handleSubmit(data: PurchaseFormData) {
