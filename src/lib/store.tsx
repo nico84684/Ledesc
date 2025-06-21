@@ -34,7 +34,7 @@ const INITIAL_SETUP_COMPLETE_KEY = `initialSetupComplete_${APP_NAME}`;
 export function AppProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { toast } = useToast();
+  const { toast, dismiss } = useToast();
   const { user, accessToken, isFirebaseAuthReady } = useAuth();
   
   const [state, setState] = useState<AppState>({
@@ -68,7 +68,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else if (data && fileId) {
           setState(data);
           setDriveFileId(fileId);
-          toast.dismiss();
+          dismiss();
           toast({ title: 'Sincronización Completa', description: 'Datos cargados desde Google Drive.', duration: 3000});
         } else {
             // New user on Drive, load local data to upload it.
@@ -86,7 +86,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
 
     loadData();
-  }, [user, accessToken, isFirebaseAuthReady, toast]);
+  }, [user, accessToken, isFirebaseAuthReady, toast, dismiss]);
 
   // Persist data: To Drive if logged in, otherwise to localStorage
   useEffect(() => {
@@ -132,7 +132,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const daysRemainingInMonth = getDaysInMonth(now) - getDate(now);
     if (daysRemainingInMonth >= 0 && daysRemainingInMonth <= state.settings.daysBeforeEndOfMonthToRemind) {
       const totalSpentThisMonth = state.purchases
-        .filter(p => isSameMonth(parseISO(p.date), now))
+        .filter(p => {
+          try {
+            return isSameMonth(parseISO(p.date), now);
+          } catch {
+            return false;
+          }
+        })
         .reduce((sum, p) => sum + p.finalAmount, 0);
       const remainingBalance = Math.max(0, state.settings.monthlyAllowance - totalSpentThisMonth);
 
