@@ -34,4 +34,5 @@ export interface AppState {
   settings: BenefitSettings;
   merchants: Merchant[];
   isSyncing?: boolean; // Optional property to track sync status
+  isStateDirty?: boolean; // New: True if local state has changes not yet synced to Drive
 }

@@ -38,6 +38,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     purchases: [],
     settings: { ...DEFAULT_BENEFIT_SETTINGS, lastEndOfMonthReminderShownForMonth: undefined, lastLocalSaveTimestamp: 0 },
     merchants: [],
+    isStateDirty: false,
   });
   
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
@@ -76,16 +77,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
           toast({ title: 'Sincronización Manual Completa', description: 'Tus datos se guardaron en Google Drive.', duration: 4000 });
       }
       if (newFileId) setDriveFileId(newFileId);
-      // Update state with the new timestamp from the server to prevent re-syncing the same data.
-      setState(prevState => {
-        if (prevState.settings.lastBackupTimestamp !== lastBackupTimestamp) {
-          const updatedState = { ...prevState, settings: { ...prevState.settings, lastBackupTimestamp } };
-          // Also update localStorage with the synced timestamp.
-          localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(updatedState));
-          return updatedState;
-        }
-        return prevState;
-      });
+      // On success, update state with the new timestamp from the server and set dirty flag to false.
+      setState(prevState => ({
+        ...prevState,
+        settings: { ...prevState.settings, lastBackupTimestamp },
+        isStateDirty: false,
+      }));
     }
   }, [user, accessToken, toast, dismiss]);
 
@@ -94,13 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       // 1. Load local data first to provide an immediate UI.
       const localStateJSON = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
-      let localState: AppState | null = null;
-      if (localStateJSON) {
-        localState = JSON.parse(localStateJSON);
-        if (localState) {
-          setState(localState);
-        }
-      }
+      let localState: AppState | null = localStateJSON ? JSON.parse(localStateJSON) : null;
 
       // 2. If logged in, attempt to reconcile with Drive data.
       if (user && accessToken) {
@@ -110,29 +101,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           toast({ title: 'Error de Sincronización', description: `No se pudo conectar con Drive: ${error}. Usando datos locales.`, variant: 'destructive' });
+          if(localState) setState(localState);
         } else {
-          if (driveData && localState) {
-            const localTimestamp = localState.settings.lastBackupTimestamp || 0;
-            const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
-            if(currentFileId) setDriveFileId(currentFileId);
+          setDriveFileId(currentFileId);
 
+          if (driveData) { // Drive has data, begin reconciliation
+            const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
+            const localTimestamp = localState?.settings.lastBackupTimestamp || 0;
+            
             if (driveTimestamp > localTimestamp) {
-              setState(driveData);
-              localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
+              // Cloud is newer, overwrite local state. Mark as clean.
+              const cleanState = { ...driveData, isStateDirty: false };
+              setState(cleanState);
+              localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(cleanState));
               toast({ title: 'Sincronización Completa', description: 'Datos actualizados desde Google Drive.', duration: 3000 });
-            } else if (localTimestamp > driveTimestamp) {
+            } else if (localState?.isStateDirty) {
+              // Local has unsynced changes. Push them.
               toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
               syncToDrive(localState, currentFileId, false);
+              setState(localState); // Keep showing the dirty local state to the user
+            } else {
+              // Timestamps match and no dirty changes, or local is ahead but clean. Trust local.
+              if (localState) {
+                setState(localState);
+              } else {
+                // Should not happen, but as a fallback, pull from drive.
+                setState({ ...driveData, isStateDirty: false });
+              }
             }
-          } else if (driveData) {
-            setState(driveData);
-            localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
-            if(currentFileId) setDriveFileId(currentFileId);
-            toast({ title: 'Sincronización Completa', description: 'Datos cargados desde Google Drive.', duration: 3000 });
-          } else if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
-            toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
-            syncToDrive(localState, null, false);
+          } else { // Drive has NO data
+            if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
+              // Local has data, Drive is empty. First-time sync for this account.
+              toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
+              syncToDrive(localState, null, false);
+              setState(localState);
+            } else if (localState) {
+              // Local exists but is empty/default.
+              setState(localState);
+            }
           }
+        }
+      } else {
+        // User not logged in, just use local state.
+        if (localState) {
+          setState(localState);
         }
       }
       setIsInitialized(true);
@@ -148,18 +160,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!isInitialized) return;
 
     // 1. Always save locally first.
-    const timestamp = Date.now();
-    const stateToSave = { ...state, settings: { ...state.settings, lastLocalSaveTimestamp: timestamp } };
-    localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(stateToSave));
+    localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(state));
 
-    // 2. Debounce the sync to Drive.
-    if (user && accessToken) {
+    // 2. Debounce the sync to Drive if the state is dirty.
+    if (user && accessToken && state.isStateDirty) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        // Avoid syncing if state hasn't been properly loaded from Drive yet
-        if(state.settings.lastBackupTimestamp || (state.purchases.length > 0 || state.merchants.length > 0)) {
-           syncToDrive(state, driveFileId, false);
-        }
+        syncToDrive(state, driveFileId, false);
       }, 2500);
     }
 
@@ -190,7 +197,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const newMerchant: Merchant = { id: `local_m_${Date.now()}`, name: newPurchase.merchantName, location: newPurchase.merchantLocation };
         updatedMerchants = [...prevState.merchants, newMerchant].sort((a, b) => a.name.localeCompare(b.name));
       }
-      return { ...prevState, purchases: updatedPurchases, merchants: updatedMerchants };
+      return { ...prevState, purchases: updatedPurchases, merchants: updatedMerchants, isStateDirty: true };
     });
   }, []);
 
@@ -204,17 +211,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       return {
         ...prevState,
-        purchases: prevState.purchases.map(p => p.id === purchaseId ? { ...p, ...updatedCoreData } : p)
+        purchases: prevState.purchases.map(p => p.id === purchaseId ? { ...p, ...updatedCoreData } : p),
+        isStateDirty: true,
       };
     });
   }, []);
 
   const deletePurchase = useCallback((purchaseId: string) => {
-    setState(prevState => ({ ...prevState, purchases: prevState.purchases.filter(p => p.id !== purchaseId) }));
+    setState(prevState => ({ ...prevState, purchases: prevState.purchases.filter(p => p.id !== purchaseId), isStateDirty: true }));
   }, []);
 
   const updateSettings = useCallback((newSettingsData: Partial<BenefitSettings>) => {
-    setState(prevState => ({ ...prevState, settings: { ...prevState.settings, ...newSettingsData } }));
+    setState(prevState => ({ ...prevState, settings: { ...prevState.settings, ...newSettingsData }, isStateDirty: true }));
   }, []);
   
   const addMerchant = useCallback((merchantName: string, merchantLocation?: string) => {
@@ -229,7 +237,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         const newMerchant: Merchant = { id: `local_m_${Date.now()}`, name: trimmedName, location: trimmedLocation };
         const updatedMerchants = [...prevState.merchants, newMerchant].sort((a,b) => a.name.localeCompare(b.name));
-        return { ...prevState, merchants: updatedMerchants };
+        return { ...prevState, merchants: updatedMerchants, isStateDirty: true };
     });
   }, [toast]);
 
@@ -285,7 +293,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const restoredMerchants: Merchant[] = merchantsJSON.map((m, i) => ({ ...m, id: m.id || `xl_m_${Date.now()}_${i}` }));
         const restoredSettings = settingsJSON.length > 0 ? { ...DEFAULT_BENEFIT_SETTINGS, ...settingsJSON[0]} : state.settings;
         
-        setState({ purchases: restoredPurchases, merchants: restoredMerchants, settings: restoredSettings });
+        setState({ purchases: restoredPurchases, merchants: restoredMerchants, settings: restoredSettings, isStateDirty: true });
         toast({ title: "Restauración Exitosa", description: "Datos restaurados desde Excel. Los cambios se guardarán en Drive si has iniciado sesión." });
 
       } catch (error: any) {
@@ -324,5 +332,3 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
-
-    

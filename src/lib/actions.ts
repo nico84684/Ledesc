@@ -108,7 +108,10 @@ export async function saveDriveData(accessToken: string, fileId: string | null, 
         };
         
         const updatedTimestamp = Date.now();
-        const dataToSave: AppState = { ...data, settings: { ...data.settings, lastBackupTimestamp: updatedTimestamp }};
+        // Exclude transient client-side flags before saving to Drive.
+        const { isStateDirty, isSyncing, ...dataToSaveClean } = data; 
+        const dataToSave: AppState = { ...dataToSaveClean, settings: { ...dataToSaveClean.settings, lastBackupTimestamp: updatedTimestamp }};
+
         const multipartRequestBody =
             delimiter +
             'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
