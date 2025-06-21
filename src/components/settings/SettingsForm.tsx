@@ -58,11 +58,13 @@ export function SettingsForm() {
     defaultValues: settings || DEFAULT_BENEFIT_SETTINGS,
   });
 
+  const { reset } = form;
+
   const watchEnableEndOfMonthReminder = form.watch("enableEndOfMonthReminder");
 
   useEffect(() => {
     if (isInitialized && settings) {
-      form.reset({ ...DEFAULT_BENEFIT_SETTINGS, ...settings });
+      reset({ ...DEFAULT_BENEFIT_SETTINGS, ...settings });
       if (typeof window !== 'undefined') {
         const setupComplete = localStorage.getItem(INITIAL_SETUP_COMPLETE_KEY) === 'true';
         if (!setupComplete) {
@@ -73,7 +75,7 @@ export function SettingsForm() {
         }
       }
     }
-  }, [isInitialized, settings, form, router, pathname, user]);
+  }, [isInitialized, settings, reset, router, pathname, user]);
 
   async function onSubmitSettings(data: SettingsFormData) {
     setIsSubmittingSettings(true);
@@ -111,7 +113,6 @@ export function SettingsForm() {
   };
 
   const handleSwitchChange = (field: keyof Pick<BenefitSettings, "enableEndOfMonthReminder">, checked: boolean) => {
-    form.setValue(field, checked, { shouldDirty: true, shouldValidate: true });
     updateSettings({ [field]: checked });
     toast({ title: "Configuración Actualizada", description: `Recordatorio fin de mes ${checked ? 'activado' : 'desactivado'}.` });
   };
