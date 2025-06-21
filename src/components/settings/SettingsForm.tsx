@@ -206,5 +206,3 @@ export function SettingsForm() {
     </div>
   );
 }
-
-    
