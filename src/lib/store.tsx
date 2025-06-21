@@ -6,7 +6,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS, APP_NAME } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid, getDaysInMonth, getDate, isSameMonth } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/components/layout/Providers';
@@ -103,24 +103,37 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           toast({ title: 'Error de Sincronización', description: `No se pudo conectar con Drive: ${error}. Usando datos locales.`, variant: 'destructive' });
-        } else if (driveData) {
-          // Found data on Drive. Let's reconcile.
-          setDriveFileId(currentFileId);
-          const localTimestamp = localState?.settings.lastBackupTimestamp || 0;
-          const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
+        } else {
+          // --- NEW, ROBUST RECONCILIATION LOGIC ---
+          if (driveData && localState) {
+            // Case 1: Both local and drive data exist. Compare timestamps.
+            const localTimestamp = localState.settings.lastBackupTimestamp || 0;
+            const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
+            setDriveFileId(currentFileId);
 
-          if (driveTimestamp > localTimestamp) {
+            if (driveTimestamp > localTimestamp) {
+              // Drive is newer, PULL data from Drive.
+              setState(driveData);
+              localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
+              toast({ title: 'Sincronización Completa', description: 'Datos actualizados desde Google Drive.', duration: 3000 });
+            } else if (localTimestamp > driveTimestamp) {
+              // Local is newer, PUSH local data to Drive.
+              toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
+              syncToDrive(localState, currentFileId);
+            }
+            // If timestamps are equal, do nothing.
+          } else if (driveData) {
+            // Case 2: Only Drive data exists (e.g., new device). PULL from Drive.
             setState(driveData);
             localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
-            toast({ title: 'Sincronización Completa', description: 'Datos actualizados desde Google Drive.', duration: 3000 });
-          } else if (localTimestamp > driveTimestamp && localState) {
-            toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
-            syncToDrive(localState, currentFileId);
+            setDriveFileId(currentFileId);
+            toast({ title: 'Sincronización Completa', description: 'Datos cargados desde Google Drive.', duration: 3000 });
+          } else if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
+            // Case 3: Only local data exists and it's not empty. PUSH to Drive for the first time.
+            toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
+            syncToDrive(localState, null);
           }
-        } else if (localState) {
-          // No file on Drive, but we have local data. Upload it.
-          toast({ title: 'Configurando Nube', description: 'Creando archivo de datos en Google Drive.' });
-          syncToDrive(localState, null);
+          // Case 4 (implicit): Both are null. Do nothing, app starts fresh.
         }
       }
       setIsInitialized(true);
@@ -144,7 +157,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user && accessToken) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
-        syncToDrive(state, driveFileId);
+        // Avoid syncing if state hasn't been properly loaded from Drive yet
+        if(state.settings.lastBackupTimestamp || (state.purchases.length > 0 || state.merchants.length > 0)) {
+           syncToDrive(state, driveFileId);
+        }
       }, 2500);
     }
 
@@ -309,3 +325,5 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
+    
