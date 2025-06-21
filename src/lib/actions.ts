@@ -1,7 +1,8 @@
 // This file contains server actions.
 "use server";
 
-import type { AppState, ContactFormData } from '@/types';
+import type { AppState } from '@/types';
+import type { ContactFormData } from '@/lib/schemas';
 import { google } from 'googleapis';
 import { APP_NAME } from '@/config/constants';
 
