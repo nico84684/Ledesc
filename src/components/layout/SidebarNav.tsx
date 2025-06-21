@@ -13,6 +13,7 @@ import {
   useSidebar, 
 } from '@/components/ui/sidebar';
 import { APP_NAME } from '@/config/constants'; 
+import { useCallback } from 'react';
 
 const navItems = [
   { href: '/', label: 'Dashboard', icon: Home },
@@ -28,11 +29,11 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { isMobile, setOpenMobile } = useSidebar(); 
 
-  const handleLinkClick = () => {
+  const handleLinkClick = useCallback(() => {
     if (isMobile) {
       setOpenMobile(false); 
     }
-  };
+  }, [isMobile, setOpenMobile]);
 
   return (
     <nav className="flex flex-col h-full">
