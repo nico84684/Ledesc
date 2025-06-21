@@ -117,7 +117,7 @@ export function SettingsForm() {
   };
   
   if (!isInitialized || (authLoading && !isFirebaseAuthReady)) {
-     return ( <div className="flex justify-center items-center h-64"> <LoadingSpinner size={48} /> <p className="ml-4 text-lg text-muted-foreground">Cargando...</p> -</div> );
+     return ( <div className="flex justify-center items-center h-64"> <LoadingSpinner size={48} /> <p className="ml-4 text-lg text-muted-foreground">Cargando...</p></div> );
   }
 
   const lastSyncTimestamp = settings?.lastBackupTimestamp;
