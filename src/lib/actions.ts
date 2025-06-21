@@ -3,17 +3,17 @@
 
 import type { AppState } from '@/types';
 import { type ContactFormData } from '@/lib/schemas';
-// import { google } from 'googleapis'; // Temporarily disabled to debug server startup issues
+import { google } from 'googleapis';
 import { APP_NAME } from '@/config/constants';
 
 const APP_DATA_FILENAME = 'ledesc_app_data.json';
 const APP_DATA_MIME_TYPE = 'application/json';
 
-// async function getOauth2Client(accessToken: string) {
-//     const oauth2Client = new google.auth.OAuth2();
-//     oauth2Client.setCredentials({ access_token: accessToken });
-//     return oauth2Client;
-// }
+async function getOauth2Client(accessToken: string) {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    return oauth2Client;
+}
 
 /**
  * Finds the app data file in Google Drive and returns its content.
@@ -21,11 +21,6 @@ const APP_DATA_MIME_TYPE = 'application/json';
  * @returns An object containing the fileId and the file content (as AppState).
  */
 export async function getDriveData(accessToken: string): Promise<{ fileId: string | null; data: AppState | null; error?: string }> {
-    console.warn("[Action] Google Drive functionality is temporarily disabled for server stability testing.");
-    // Temporarily returning an error to prevent app from hanging
-    return { fileId: null, data: null, error: 'La sincronización con Google Drive está temporalmente deshabilitada.' };
-
-    /* Original implementation:
     try {
         const oauth2Client = await getOauth2Client(accessToken);
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
@@ -65,7 +60,6 @@ export async function getDriveData(accessToken: string): Promise<{ fileId: strin
         console.error('[Action] Error getting data from Google Drive:', error.message);
         return { fileId: null, data: null, error: `Failed to get data from Drive: ${error.message}` };
     }
-    */
 }
 
 
@@ -78,11 +72,6 @@ export async function getDriveData(accessToken: string): Promise<{ fileId: strin
  * @returns An object containing the fileId of the saved file.
  */
 export async function saveDriveData(accessToken: string, fileId: string | null, data: AppState): Promise<{ fileId: string | null; error?: string; lastBackupTimestamp?: number }> {
-    console.warn("[Action] Google Drive functionality is temporarily disabled for server stability testing.");
-     // Temporarily returning an error to prevent app from hanging
-    return { fileId: fileId, error: 'La sincronización con Google Drive está temporalmente deshabilitada.' };
-    
-    /* Original Implementation:
     try {
         const oauth2Client = await getOauth2Client(accessToken);
         const drive = google.drive({ version: 'v3', auth: oauth2Client });
@@ -131,7 +120,6 @@ export async function saveDriveData(accessToken: string, fileId: string | null, 
         console.error('[Action] Error saving data to Google Drive:', error.message);
         return { fileId: null, error: `Failed to save data to Drive: ${error.message}` };
     }
-    */
 }
 
 
