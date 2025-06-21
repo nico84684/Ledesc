@@ -1,249 +1,126 @@
-
 // This file contains server actions.
 "use server";
 
-import type { PurchaseFormData, AddMerchantFormData, ContactFormData } from '@/lib/schemas';
-import type { Purchase, BenefitSettings, Merchant } from '@/types';
-import { revalidatePath } from 'next/cache';
-// import type { DriveBackupInput, DriveBackupOutput } from '@/ai/flows/driveBackupFlow';
-// import type { DriveRestoreInput, DriveRestoreOutput } from '@/ai/flows/restoreDataFromDriveFlow';
-import { APP_NAME, DEFAULT_BENEFIT_SETTINGS } from '@/config/constants';
-import { doc, setDoc, getDoc, collection, addDoc, getDocs, writeBatch, query, where, deleteDoc, orderBy } from "firebase/firestore";
-import { ensureFirebaseInitialized } from '@/lib/firebase';
+import type { AppState, ContactFormData } from '@/types';
+import { google } from 'googleapis';
+import { APP_NAME } from '@/config/constants';
 
-// Helper para obtener la instancia de DB en acciones de servidor
-async function getDbInstance() {
-  const { db } = ensureFirebaseInitialized();
-  if (!db) {
-    throw new Error("Firestore no está inicializado en la acción del servidor.");
-  }
-  return db;
+const APP_DATA_FILENAME = 'ledesc_app_data.json';
+const APP_DATA_MIME_TYPE = 'application/json';
+
+async function getOauth2Client(accessToken: string) {
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    return oauth2Client;
 }
 
-export async function addPurchaseAction(userId: string, data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string; purchaseId?: string }> {
-  console.log("[Server Action] addPurchaseAction called for userID:", userId);
-  if (!userId) return { success: false, message: "Usuario no autenticado." };
+/**
+ * Finds the app data file in Google Drive and returns its content.
+ * @param accessToken The user's Google access token.
+ * @returns An object containing the fileId and the file content (as AppState).
+ */
+export async function getDriveData(accessToken: string): Promise<{ fileId: string | null; data: AppState | null; error?: string }> {
+    try {
+        const oauth2Client = await getOauth2Client(accessToken);
+        const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-  const db = await getDbInstance();
+        const res = await drive.files.list({
+            q: `name='${APP_DATA_FILENAME}' and mimeType='${APP_DATA_MIME_TYPE}' and 'root' in parents and trashed=false`,
+            spaces: 'drive',
+            fields: 'files(id, name)',
+            pageSize: 1,
+        });
 
-  const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
-  const newPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = {
-    amount: data.amount,
-    date: data.date,
-    merchantName: data.merchantName.trim(),
-    merchantLocation: data.merchantLocation?.trim() || undefined,
-    description: data.description || undefined,
-    discountApplied: parseFloat(discountAmount.toFixed(2)),
-    finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
-  };
+        if (res.data.files && res.data.files.length > 0) {
+            const file = res.data.files[0];
+            const fileId = file.id;
 
-  try {
-    const userPurchasesCol = collection(db, "users", userId, "purchases");
-    const docRef = await addDoc(userPurchasesCol, newPurchaseData);
+            if (!fileId) {
+                return { fileId: null, data: null, error: 'File found but ID is missing.' };
+            }
 
-    const merchantName = newPurchaseData.merchantName;
-    const merchantLocation = newPurchaseData.merchantLocation;
-    const merchantsCol = collection(db, "users", userId, "merchants");
-    const q = query(merchantsCol, where("name", "==", merchantName), where("location", "==", merchantLocation || null));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-        await addDoc(merchantsCol, { name: merchantName, location: merchantLocation || null });
+            const fileContentRes = await drive.files.get({
+                fileId: fileId,
+                alt: 'media',
+            });
+            
+            const fileData = fileContentRes.data as any;
+
+            if (typeof fileData === 'object') {
+                 return { fileId, data: fileData as AppState };
+            }
+            return { fileId, data: JSON.parse(fileData) as AppState };
+
+        } else {
+            // File not found, which is a normal case for a new user.
+            return { fileId: null, data: null };
+        }
+    } catch (error: any) {
+        console.error('[Action] Error getting data from Google Drive:', error.message);
+        return { fileId: null, data: null, error: `Failed to get data from Drive: ${error.message}` };
     }
-
-    revalidatePath('/');
-    revalidatePath('/history');
-    revalidatePath('/merchants');
-    return { success: true, message: "Compra registrada exitosamente.", purchaseId: docRef.id };
-  } catch (error: any) {
-    console.error("[Server Action] addPurchaseAction Error:", error);
-    return { success: false, message: `Error al registrar la compra: ${error.message}` };
-  }
 }
 
-export async function editPurchaseAction(userId: string, purchaseId: string, data: PurchaseFormData, currentSettings: BenefitSettings): Promise<{ success: boolean; message: string }> {
-  console.log("[Server Action] editPurchaseAction called for userID:", userId, "purchaseID:", purchaseId);
-  if (!userId) return { success: false, message: "Usuario no autenticado." };
 
-  const db = await getDbInstance();
+/**
+ * Saves the entire application state to a JSON file in Google Drive.
+ * Creates the file if it doesn't exist (fileId is null).
+ * @param accessToken The user's Google access token.
+ * @param fileId The ID of the file to update. If null, a new file will be created.
+ * @param data The AppState to save.
+ * @returns An object containing the fileId of the saved file.
+ */
+export async function saveDriveData(accessToken: string, fileId: string | null, data: AppState): Promise<{ fileId: string | null; error?: string; lastBackupTimestamp?: number }> {
+    try {
+        const oauth2Client = await getOauth2Client(accessToken);
+        const drive = google.drive({ version: 'v3', auth: oauth2Client });
+        
+        const timestamp = Date.now();
+        const dataToSave = {
+            ...data,
+            settings: {
+                ...data.settings,
+                lastBackupTimestamp: timestamp,
+            }
+        };
 
-  const discountAmount = (data.amount * currentSettings.discountPercentage) / 100;
-  const updatedPurchaseData: Omit<Purchase, 'id' | 'receiptImageUrl'> = {
-    amount: data.amount,
-    date: data.date,
-    merchantName: data.merchantName.trim(),
-    merchantLocation: data.merchantLocation?.trim() || undefined,
-    description: data.description || undefined,
-    discountApplied: parseFloat(discountAmount.toFixed(2)),
-    finalAmount: parseFloat((data.amount - discountAmount).toFixed(2)),
-  };
+        const fileMetadata = {
+            name: APP_DATA_FILENAME,
+            mimeType: APP_DATA_MIME_TYPE,
+        };
 
-  try {
-    const purchaseDocRef = doc(db, "users", userId, "purchases", purchaseId);
-    await setDoc(purchaseDocRef, updatedPurchaseData, { merge: true });
+        const media = {
+            mimeType: APP_DATA_MIME_TYPE,
+            body: JSON.stringify(dataToSave, null, 2),
+        };
 
-    const merchantName = updatedPurchaseData.merchantName;
-    const merchantLocation = updatedPurchaseData.merchantLocation;
-    const merchantsCol = collection(db, "users", userId, "merchants");
-    const q = query(merchantsCol, where("name", "==", merchantName), where("location", "==", merchantLocation || null));
-    const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
-        await addDoc(merchantsCol, { name: merchantName, location: merchantLocation || null });
+        if (fileId) {
+            // Update existing file
+            const res = await drive.files.update({
+                fileId: fileId,
+                requestBody: fileMetadata,
+                media: media,
+                fields: 'id',
+            });
+            return { fileId: res.data.id || null, lastBackupTimestamp: timestamp };
+        } else {
+            // Create new file
+            const res = await drive.files.create({
+                requestBody: {
+                    ...fileMetadata,
+                    parents: ['root'],
+                },
+                media: media,
+                fields: 'id',
+            });
+            return { fileId: res.data.id || null, lastBackupTimestamp: timestamp };
+        }
+    } catch (error: any) {
+        console.error('[Action] Error saving data to Google Drive:', error.message);
+        return { fileId: null, error: `Failed to save data to Drive: ${error.message}` };
     }
-
-    revalidatePath('/');
-    revalidatePath('/history');
-    revalidatePath('/merchants');
-    return { success: true, message: "Compra actualizada exitosamente." };
-  } catch (error: any) {
-    console.error("[Server Action] editPurchaseAction Error:", error);
-    return { success: false, message: `Error al actualizar la compra: ${error.message}` };
-  }
 }
 
-export async function deletePurchaseAction(userId: string, purchaseId: string): Promise<{ success: boolean; message: string }> {
-  console.log(`[Server Action] deletePurchaseAction called for userID: ${userId}, purchaseID: ${purchaseId}`);
-  if (!userId) return { success: false, message: "Usuario no autenticado." };
-
-  const db = await getDbInstance();
-  try {
-    const purchaseDocRef = doc(db, "users", userId, "purchases", purchaseId);
-    await deleteDoc(purchaseDocRef);
-    revalidatePath('/');
-    revalidatePath('/history');
-    return { success: true, message: "Compra eliminada exitosamente." };
-  } catch (error: any) {
-    console.error("[Server Action] deletePurchaseAction Error:", error);
-    return { success: false, message: `Error al eliminar la compra: ${error.message}` };
-  }
-}
-
-export async function updateSettingsAction(userId: string, data: BenefitSettings): Promise<{ success: boolean; message: string; settings?: BenefitSettings }> {
-  console.log("[Server Action] updateSettingsAction called for userID:", userId);
-  console.log("[Server Action] updateSettingsAction received data:", JSON.stringify(data, null, 2));
-
-
-  if (!userId) {
-    console.error("[Server Action] updateSettingsAction: userId is missing.");
-    return { success: false, message: "Usuario no autenticado. Esta acción requiere autenticación." };
-  }
-
-  const { db } = ensureFirebaseInitialized();
-  if (!db) {
-    console.error("[Server Action] updateSettingsAction: Firestore DB instance is not available.");
-    return { success: false, message: "Error interno del servidor: Base de datos no disponible." };
-  }
-
-  const settingsToSave: Partial<BenefitSettings> = {};
-
-  // Required numeric fields
-  if (typeof data.monthlyAllowance === 'number') settingsToSave.monthlyAllowance = data.monthlyAllowance;
-  else settingsToSave.monthlyAllowance = DEFAULT_BENEFIT_SETTINGS.monthlyAllowance;
-
-  if (typeof data.discountPercentage === 'number') settingsToSave.discountPercentage = data.discountPercentage;
-  else settingsToSave.discountPercentage = DEFAULT_BENEFIT_SETTINGS.discountPercentage;
-
-  if (typeof data.alertThresholdPercentage === 'number') settingsToSave.alertThresholdPercentage = data.alertThresholdPercentage;
-  else settingsToSave.alertThresholdPercentage = DEFAULT_BENEFIT_SETTINGS.alertThresholdPercentage;
-  
-  if (typeof data.daysBeforeEndOfMonthToRemind === 'number') settingsToSave.daysBeforeEndOfMonthToRemind = data.daysBeforeEndOfMonthToRemind;
-  else settingsToSave.daysBeforeEndOfMonthToRemind = DEFAULT_BENEFIT_SETTINGS.daysBeforeEndOfMonthToRemind;
-
-  // Required boolean fields
-  if (typeof data.autoBackupToDrive === 'boolean') settingsToSave.autoBackupToDrive = data.autoBackupToDrive;
-  else settingsToSave.autoBackupToDrive = DEFAULT_BENEFIT_SETTINGS.autoBackupToDrive;
-
-  if (typeof data.enableEndOfMonthReminder === 'boolean') settingsToSave.enableEndOfMonthReminder = data.enableEndOfMonthReminder;
-  else settingsToSave.enableEndOfMonthReminder = DEFAULT_BENEFIT_SETTINGS.enableEndOfMonthReminder;
-  
-  // Optional fields
-  if (typeof data.lastBackupTimestamp === 'number') settingsToSave.lastBackupTimestamp = data.lastBackupTimestamp;
-  else settingsToSave.lastBackupTimestamp = 0; // Default to 0 if not provided or incorrect type
-
-  if (typeof data.lastEndOfMonthReminderShownForMonth === 'string' && data.lastEndOfMonthReminderShownForMonth.trim() !== '') {
-    settingsToSave.lastEndOfMonthReminderShownForMonth = data.lastEndOfMonthReminderShownForMonth;
-  }
-  // lastLocalSaveTimestamp is not saved to Firestore from this action.
-
-  console.log("[Server Action] updateSettingsAction - Object to be saved to Firestore:", JSON.stringify(settingsToSave, null, 2));
-
-  try {
-    const settingsDocRef = doc(db, "users", userId, "settings", "main");
-    await setDoc(settingsDocRef, settingsToSave, { merge: true });
-    
-    console.log("[Server Action] updateSettingsAction: Firestore setDoc successful.");
-    revalidatePath('/');
-    revalidatePath('/settings');
-    const currentSettingsDoc = await getDoc(settingsDocRef);
-    const fetchedSettings = currentSettingsDoc.exists() ? currentSettingsDoc.data() as BenefitSettings : undefined;
-    
-    return { success: true, message: "Configuración actualizada en Firestore.", settings: fetchedSettings || data };
-  } catch (error: any) {
-    console.error(
-        "[Server Action] updateSettingsAction Firestore Error:", 
-        error.message, 
-        "Code:", error.code, 
-        "Details:", error.details, 
-        "Stack:", error.stack
-    );
-    return { 
-        success: false, 
-        message: `Error al actualizar configuración en Firestore: ${error.message}${error.code ? ` (Código: ${error.code})` : ''}` 
-    };
-  }
-}
-
-export async function addManualMerchantAction(userId: string, data: AddMerchantFormData): Promise<{ success: boolean; message: string; merchantId?: string, merchant?: Merchant }> {
-  console.log("[Server Action] addManualMerchantAction for userID:", userId);
-  if (!userId) return { success: false, message: "Usuario no autenticado." };
-
-  const db = await getDbInstance();
-  const newMerchantData = {
-    name: data.name.trim(),
-    location: data.location?.trim() || null, // Firestore stores null for empty optional location
-  };
-
-  try {
-    const merchantsColRef = collection(db, "users", userId, "merchants");
-    const q = query(merchantsColRef, where("name", "==", newMerchantData.name), where("location", "==", newMerchantData.location));
-    const querySnapshot = await getDocs(q);
-
-    if (!querySnapshot.empty) {
-      const existingDoc = querySnapshot.docs[0];
-      return {
-        success: false, message: `El comercio "${newMerchantData.name}" ${newMerchantData.location ? `en "${newMerchantData.location}"` : ''} ya existe.`,
-        merchantId: existingDoc.id, merchant: { id: existingDoc.id, ...existingDoc.data() } as Merchant
-      };
-    }
-
-    const docRef = await addDoc(merchantsColRef, newMerchantData);
-    revalidatePath('/merchants');
-    return {
-      success: true, message: `Comercio "${newMerchantData.name}" añadido a Firestore.`,
-      merchantId: docRef.id, merchant: { id: docRef.id, name: newMerchantData.name, location: newMerchantData.location || undefined }
-    };
-  } catch (error: any) {
-    console.error("[Server Action] addManualMerchantAction Error:", error);
-    return { success: false, message: `Error al añadir comercio: ${error.message}` };
-  }
-}
-
-/*
-export async function triggerGoogleDriveBackupAction(
-  userId: string, userEmail: string, purchasesData: string, merchantsData: string, settingsData: string, accessToken?: string
-): Promise<DriveBackupOutput> {
-  // Temporarily disabled for debugging
-  console.warn("triggerGoogleDriveBackupAction is temporarily disabled.");
-  return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
-}
-
-export async function triggerGoogleDriveRestoreAction(
-  userId: string, userEmail: string, accessToken?: string
-): Promise<DriveRestoreOutput> {
-  // Temporarily disabled for debugging
-  console.warn("triggerGoogleDriveRestoreAction is temporarily disabled.");
-  return { success: false, message: "Función temporalmente deshabilitada para diagnóstico." };
-}
-*/
 
 export async function contactFormAction(data: ContactFormData): Promise<{ success: boolean; message: string }> {
   const targetEmail = "nicolas.s.fernandez@gmail.com";

@@ -30,15 +30,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { deletePurchaseAction } from '@/lib/actions';
 import { useAuth } from '@/components/layout/Providers';
 
 const ITEMS_PER_PAGE = 10;
 const ALL_MONTHS_FILTER_VALUE = "__ALL_MONTHS__"; 
 
 export function TransactionHistoryTable() {
-  const { purchases, settings } = useAppState();
-  const { exportToCSV, isInitialized, deletePurchase: deletePurchaseFromStoreAndFirestore } = useAppDispatch();
+  const { purchases, settings, isSyncing } = useAppState();
+  const { exportToCSV, isInitialized, deletePurchase } = useAppDispatch();
   const { user } = useAuth();
   const { toast } = useToast();
   
@@ -107,10 +106,6 @@ export function TransactionHistoryTable() {
   };
   
   const handleEditClick = (purchase: Purchase) => {
-    if (!user) {
-        toast({title: "Acción no permitida", description: "Debes iniciar sesión para editar compras.", variant: "destructive"});
-        return;
-    }
     setSelectedPurchaseForEdit(purchase);
     setIsEditDialogOpen(true);
   };
@@ -121,30 +116,18 @@ export function TransactionHistoryTable() {
   };
 
   const handleDeleteClick = (purchase: Purchase) => {
-    if (!user) {
-        toast({title: "Acción no permitida", description: "Debes iniciar sesión para eliminar compras.", variant: "destructive"});
-        return;
-    }
     setSelectedPurchaseForDelete(purchase);
   };
 
   const confirmDeletePurchase = async () => {
-    if (!selectedPurchaseForDelete || !user || !user.uid) {
-        toast({title: "Error", description: "No se seleccionó compra o usuario no autenticado.", variant: "destructive"});
-        return;
-    }
-    const purchaseIdToDelete = selectedPurchaseForDelete.id;
+    if (!selectedPurchaseForDelete) return;
+    
     setIsDeleting(true);
     try {
-      const result = await deletePurchaseAction(user.uid, purchaseIdToDelete);
-      if (result.success) {
-        await deletePurchaseFromStoreAndFirestore(purchaseIdToDelete); 
-        toast({ title: "Eliminación Exitosa", description: result.message });
-      } else {
-        toast({ title: "Error al Eliminar", description: result.message || "No se pudo eliminar la compra.", variant: "destructive" });
-      }
+      deletePurchase(selectedPurchaseForDelete.id); 
+      toast({ title: "Eliminación Exitosa", description: "La compra ha sido eliminada. Los cambios se guardarán automáticamente." });
     } catch (error: any) {
-      console.error(`[TransactionHistoryTable] Error deleting purchase ID ${purchaseIdToDelete}:`, error);
+      console.error(`[TransactionHistoryTable] Error deleting purchase ID ${selectedPurchaseForDelete.id}:`, error);
       toast({ title: "Error Inesperado", description: `Ocurrió un error al intentar eliminar la compra: ${error.message}`, variant: "destructive" });
     } finally {
       setSelectedPurchaseForDelete(null);
@@ -156,7 +139,7 @@ export function TransactionHistoryTable() {
     return (
       <div className="flex justify-center items-center h-64">
         <LoadingSpinner size={48} />
-        <p className="ml-4 text-lg text-muted-foreground">Cargando transacciones desde la nube...</p>
+        <p className="ml-4 text-lg text-muted-foreground">Cargando datos...</p>
       </div>
     );
   }
@@ -219,7 +202,7 @@ export function TransactionHistoryTable() {
           <Button onClick={clearFilters} variant="outline" className="w-full sm:w-auto">
             <FilterX className="mr-2 h-4 w-4" /> Limpiar
           </Button>
-          <Button onClick={exportToCSV} className="w-full sm:w-auto" disabled={!user}>
+          <Button onClick={exportToCSV} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" /> Exportar
           </Button>
         </div>
@@ -229,10 +212,10 @@ export function TransactionHistoryTable() {
         <div className="text-center py-10">
           <Tag className="mx-auto h-12 w-12 text-muted-foreground" />
           <p className="mt-4 text-lg font-medium text-muted-foreground">
-            { user ? "No se encontraron transacciones." : "Inicia sesión para ver tus transacciones."}
+            No se encontraron transacciones.
           </p>
           <p className="text-sm text-muted-foreground">
-           { user ? "Intenta ajustar los filtros o registra una nueva compra." : "Tus datos se guardan en la nube de forma segura."}
+           Intenta ajustar los filtros o registra una nueva compra.
           </p>
         </div>
       ) : (
@@ -240,7 +223,7 @@ export function TransactionHistoryTable() {
           <Table>
             <TableCaption>
               Mostrando {paginatedPurchases.length} de {filteredPurchases.length} transacciones.
-              {settings && ` Descuento aplicado: ${settings.discountPercentage}%.`}
+              {isSyncing && user && <span className="flex items-center justify-center mt-2 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin" />Sincronizando...</span>}
             </TableCaption>
             <TableHeader>
               <TableRow className="text-xxs sm:text-sm">
@@ -342,7 +325,7 @@ export function TransactionHistoryTable() {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Estás seguro de que quieres eliminar esta compra?</AlertDialogTitle>
               <AlertDialogDescription>
-                Esta acción no se puede deshacer. La compra realizada el {formatDateSafe(selectedPurchaseForDelete.date, "dd 'de' MMMM 'de' yyyy")} por {formatCurrencyARS(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente de la nube.
+                Esta acción no se puede deshacer. La compra realizada el {formatDateSafe(selectedPurchaseForDelete.date, "dd 'de' MMMM 'de' yyyy")} por {formatCurrencyARS(selectedPurchaseForDelete.amount)} en "{selectedPurchaseForDelete.merchantName}" será eliminada permanentemente.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

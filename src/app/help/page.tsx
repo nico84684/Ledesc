@@ -76,7 +76,7 @@ export default function HelpPage() {
                   <li><strong>Ubicación del Comercio:</strong> La dirección o sucursal (opcional, pero útil para distinguir comercios con el mismo nombre). Se autocompleta si seleccionas un comercio existente con ubicación.</li>
                   <li><strong>Descripción:</strong> Notas adicionales sobre la compra (opcional).</li>
                 </ul>
-                 <p>Al registrar, el sistema calculará automáticamente el descuento (según tu configuración) y el monto final.</p>
+                 <p>Al registrar, el sistema calculará automáticamente el descuento (según tu configuración) y el monto final. Si has iniciado sesión, la compra se guardará automáticamente en tu Google Drive.</p>
                  <p>Los comercios nuevos (combinación de nombre y ubicación) se añaden automáticamente a tu lista en la sección "Comercios".</p>
               </AccordionContent>
             </AccordionItem>
@@ -131,7 +131,6 @@ export default function HelpPage() {
                 <ul className="list-disc list-inside pl-4 space-y-1">
                   <li>Usa el formulario para ingresar el nombre del comercio.</li>
                   <li>La ubicación es opcional pero ayuda a distinguir sucursales. Un comercio se considera único por la combinación de su nombre y ubicación.</li>
-                  <li>Si añades un comercio con un nombre que ya existe pero sin ubicación, y luego le añades una ubicación, el sistema actualizará el comercio existente.</li>
                 </ul>
 
                 <p><strong>Lista de Comercios:</strong></p>
@@ -152,7 +151,7 @@ export default function HelpPage() {
               </AccordionTrigger>
               <AccordionContent className="space-y-4 text-base pl-2">
                 <p><strong>Configuración del Beneficio:</strong></p>
-                <p>Define los parámetros principales de tu beneficio gastronómico:</p>
+                <p>Define los parámetros principales de tu beneficio gastronómico. Tus cambios se guardarán automáticamente.</p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
                   <li><strong>Beneficio Mensual Total ($):</strong> El monto máximo que cubre tu beneficio cada mes.</li>
                   <li><strong>Porcentaje de Descuento (%):</strong> El porcentaje que se descuenta del monto original de cada compra.</li>
@@ -163,33 +162,24 @@ export default function HelpPage() {
                 <ul className="list-disc list-inside pl-4 space-y-1">
                   <li>Activa/Desactiva el recordatorio para recibir una notificación si te queda saldo pendiente cerca de fin de mes.</li>
                   <li>Si está activo, puedes configurar cuántos días antes de que termine el mes quieres recibir el aviso (ej. 3 días antes).</li>
-                  <li>El recordatorio solo se muestra una vez por mes.</li>
                 </ul>
                 
-                <p><strong><UserCheck className="inline h-5 w-5 text-blue-600" /> Autenticación (Inicio de Sesión):</strong></p>
+                <p><strong><UserCheck className="inline h-5 w-5 text-blue-600" /> Autenticación y Sincronización en la Nube:</strong></p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                    <li>Inicia sesión con tu cuenta de Google para habilitar las funciones de Backup y Restauración en Google Drive, así como la sincronización de tus datos (compras, comercios, configuración) entre dispositivos.</li>
+                    <li>Inicia sesión con tu cuenta de Google para habilitar la sincronización automática de tus datos (compras, comercios, configuración) con tu Google Drive.</li>
                     <li>Si no inicias sesión, tus datos se guardan únicamente en el navegador y dispositivo actual.</li>
-                    <li>La aplicación solicitará permiso para acceder a los archivos que crea (`drive.file`) solo si utilizas la función de Backup/Restauración a Google Drive, no a todo tu Drive.</li>
                 </ul>
 
-                <p><strong><FileUp className="inline h-5 w-5 text-green-600" /> Gestión de Datos - Backup (Copia de Seguridad):</strong></p>
-                <p>Guarda tus datos para protegerlos o transferirlos:</p>
+                <p><strong><FileUp className="inline h-5 w-5 text-green-600" /> Backup Manual a Excel:</strong></p>
+                <p>Guarda una copia de tus datos actuales en tu computadora:</p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                  <li><strong>A Excel:</strong> Descarga un archivo Excel (.xlsx) con tus compras y comercios. Esto actualiza la "fecha del último backup" (local o en la nube según estés logueado).</li>
-                  <li><strong>A Google Drive:</strong> (Requiere inicio de sesión) Guarda un archivo JSON en una carpeta específica (`LEDESC_App_Backups`) en tu Google Drive. Esto actualiza la "fecha del último backup".</li>
-                  <li><strong>Backup Automático a Google Drive:</strong> Si está activo (y has iniciado sesión), la app intentará hacer un backup a Drive automáticamente después de cada nueva compra o cambio en la lista de comercios o configuración.</li>
-                  <li>Se muestra la fecha del último backup realizado y cuántos datos nuevos hay desde entonces.</li>
+                  <li><strong>A Excel:</strong> Descarga un archivo Excel (.xlsx) con tus compras, comercios y configuración actual. Esto es útil para tener un respaldo local o para análisis externo.</li>
                 </ul>
 
-                <p><strong><FileDown className="inline h-5 w-5 text-red-600" /> Gestión de Datos - Restauración:</strong></p>
+                <p><strong><FileDown className="inline h-5 w-5 text-red-600" /> Restaurar Datos desde Excel:</strong></p>
                 <p className="font-semibold text-destructive-foreground bg-destructive/10 p-2 rounded-md border border-destructive/30">
-                  ¡Atención! Restaurar datos reemplazará TODAS tus compras, comercios y (en caso de Drive) configuraciones actuales con los datos del archivo seleccionado. Se recomienda hacer un backup antes si tienes cambios locales importantes.
+                  ¡Atención! Restaurar datos desde un archivo Excel reemplazará TODA tu información actual (compras, comercios y configuración) con los datos del archivo. Este cambio se sincronizará con Google Drive si has iniciado sesión.
                 </p>
-                <ul className="list-disc list-inside pl-4 space-y-1 mt-2">
-                  <li><strong>Desde Excel:</strong> Selecciona un archivo Excel (.xlsx) previamente guardado por la app. Debe contener las hojas "Compras" y "Comercios" con el formato correcto.</li>
-                  <li><strong>Desde Google Drive:</strong> (Requiere inicio de sesión) Restaura la última versión del archivo de backup guardado en tu Google Drive. Esto también restaurará la configuración guardada en ese backup.</li>
-                </ul>
               </AccordionContent>
             </AccordionItem>
             
@@ -203,30 +193,24 @@ export default function HelpPage() {
               <AccordionContent className="space-y-4 text-base pl-2">
                 <p><strong>¿Cómo se guardan mis datos si inicio sesión?</strong></p>
                 <p>
-                  Si eliges iniciar sesión con tu cuenta de Google, tus datos de la aplicación (compras, comercios y configuración) se almacenan de forma segura en <strong>Firebase Firestore</strong>, una base de datos en la nube proporcionada por Google. Esto permite las siguientes ventajas:
+                  Si eliges iniciar sesión con tu cuenta de Google, tus datos de la aplicación (compras, comercios y configuración) se almacenan en un **único archivo JSON** (`ledesc_app_data.json`) en la carpeta raíz de tu **Google Drive**. Esto permite las siguientes ventajas:
                 </p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                  <li><strong>Sincronización Multiplataforma:</strong> Accede a tus datos actualizados desde cualquier dispositivo (PC, móvil, tablet) donde inicies sesión con la misma cuenta.</li>
+                  <li><strong>Sincronización Automática:</strong> Cualquier cambio que hagas se guarda automáticamente en el archivo de tu Drive, permitiéndote acceder a tus datos actualizados desde cualquier dispositivo donde inicies sesión con la misma cuenta.</li>
+                  <li><strong>Control Total:</strong> El archivo de datos te pertenece y reside en tu Google Drive. Tienes control total sobre él.</li>
                   <li><strong>Persistencia:</strong> Tus datos no se pierden si cambias de navegador o dispositivo.</li>
                 </ul>
                 <p>Si no inicias sesión, tus datos se guardan únicamente de forma local en el navegador que estés utilizando y no se sincronizarán.</p>
 
-                <p><strong><Lock className="inline h-4 w-4 text-green-600 mr-1" />Seguridad de tus Datos:</strong></p>
+                <p><strong><Lock className="inline h-4 w-4 text-green-600 mr-1" />Seguridad y Permisos de Google Drive:</strong></p>
                 <ul className="list-disc list-inside pl-4 space-y-1">
-                  <li>Utilizamos las reglas de seguridad de Firebase Firestore para asegurar que solo tú, con tu cuenta autenticada, puedas acceder y modificar tus propios datos. Nadie más tiene acceso a tu información personal almacenada en la nube.</li>
+                  <li>La aplicación solicita el permiso `drive.file`. Esto significa que la aplicación **solo puede acceder a los archivos que ella misma crea**.</li>
+                  <li>{APP_NAME} **no tiene acceso** a ningún otro archivo o carpeta en tu Drive, solo al archivo `ledesc_app_data.json` que crea y gestiona.</li>
                   <li>Tu contraseña de Google nunca es almacenada ni vista por {APP_NAME}. La autenticación se maneja de forma segura a través de los servicios de Google.</li>
-                </ul>
-
-                <p><strong><UserCheck className="inline h-4 w-4 text-blue-600 mr-1" />Permisos de Google Drive:</strong></p>
-                <ul className="list-disc list-inside pl-4 space-y-1">
-                  <li>La función de "Backup a Google Drive" y "Restaurar desde Google Drive" es opcional y requiere tu autorización explícita.</li>
-                  <li>Si la utilizas, {APP_NAME} solicitará permiso para el ámbito `drive.file`. Esto significa que la aplicación <strong>solo puede acceder a los archivos que ella misma crea o que tú específicamente abres con ella</strong>.</li>
-                  <li>{APP_NAME} creará una carpeta específica llamada `LEDESC_App_Backups` en tu Google Drive para almacenar los archivos de copia de seguridad. La aplicación no tiene acceso a ningún otro archivo o carpeta en tu Drive.</li>
                 </ul>
                 
                 <p><strong>No Compartimos tus Datos:</strong></p>
                 <p>Tu información personal y los datos de tus transacciones no se comparten con terceros sin tu consentimiento explícito.</p>
-                <p>Si tienes más preguntas sobre la privacidad o el manejo de tus datos, no dudes en contactarnos a través del formulario de la sección "Contacto".</p>
               </AccordionContent>
             </AccordionItem>
 
@@ -293,5 +277,3 @@ export default function HelpPage() {
     </div>
   );
 }
-
-    

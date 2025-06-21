@@ -20,7 +20,7 @@ export interface BenefitSettings {
   enableEndOfMonthReminder: boolean; // Nuevo: Habilitar recordatorio de fin de mes
   daysBeforeEndOfMonthToRemind: number; // Nuevo: Días antes para recordar
   lastLocalSaveTimestamp?: number; // Milliseconds since epoch for local storage save
-  lastEndOfMonthReminderShownForMonth?: string; // Mover aquí para que sea parte del objeto settings
+  lastEndOfMonthReminderShownForMonth?: string;
 }
 
 export interface Merchant {
@@ -33,5 +33,5 @@ export interface AppState {
   purchases: Purchase[];
   settings: BenefitSettings;
   merchants: Merchant[];
-  // lastEndOfMonthReminderShownForMonth se mueve a BenefitSettings
+  isSyncing?: boolean; // Optional property to track sync status
 }
