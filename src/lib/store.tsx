@@ -50,7 +50,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   // Stable sync function to avoid dependency loops.
   const syncToDrive = useCallback(async (currentState: AppState, currentFileId: string | null, isManual: boolean = false) => {
-    if (!user || !accessToken || (isSavingRef.current && !isManual)) return;
+    if (!user || !accessToken) {
+        if(isManual) toast({ title: "Inicia Sesión", description: "Debes iniciar sesión con Google para sincronizar.", variant: "destructive" });
+        return;
+    };
+    if (isSavingRef.current && !isManual) return;
     
     isSavingRef.current = true;
     setIsSyncing(true);
@@ -92,6 +96,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       // 1. Load local data first to provide an immediate UI.
       const localStateJSON = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
       let localState: AppState | null = localStateJSON ? JSON.parse(localStateJSON) : null;
+      if (localState) {
+        setState(localState);
+      }
 
       // 2. If logged in, attempt to reconcile with Drive data.
       if (user && accessToken) {
@@ -101,7 +108,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           toast({ title: 'Error de Sincronización', description: `No se pudo conectar con Drive: ${error}. Usando datos locales.`, variant: 'destructive' });
-          if(localState) setState(localState);
         } else {
           setDriveFileId(currentFileId);
 
@@ -119,32 +125,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
               // Local has unsynced changes. Push them.
               toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
               syncToDrive(localState, currentFileId, false);
-              setState(localState); // Keep showing the dirty local state to the user
-            } else {
-              // Timestamps match and no dirty changes, or local is ahead but clean. Trust local.
-              if (localState) {
-                setState(localState);
-              } else {
-                // Should not happen, but as a fallback, pull from drive.
-                setState({ ...driveData, isStateDirty: false });
-              }
             }
           } else { // Drive has NO data
             if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
               // Local has data, Drive is empty. First-time sync for this account.
               toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
               syncToDrive(localState, null, false);
-              setState(localState);
-            } else if (localState) {
-              // Local exists but is empty/default.
-              setState(localState);
             }
           }
-        }
-      } else {
-        // User not logged in, just use local state.
-        if (localState) {
-          setState(localState);
         }
       }
       setIsInitialized(true);
@@ -305,8 +293,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, state.settings]);
 
   const forceSyncCallback = useCallback(() => {
+    if (!user) {
+        toast({ title: "Inicia Sesión", description: "Debes iniciar sesión con Google para sincronizar.", variant: "destructive" });
+        return;
+    }
+    if (isSyncing) {
+        toast({ title: "Sincronización en Progreso", description: "Por favor, espera a que la sincronización actual termine.", duration: 3000 });
+        return;
+    }
     syncToDrive(state, driveFileId, true);
-  }, [state, driveFileId, syncToDrive]);
+  }, [state, driveFileId, syncToDrive, user, isSyncing, toast]);
 
 
   return (
@@ -332,5 +328,7 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
+    
 
     
