@@ -165,7 +165,28 @@ export function SettingsForm() {
                 <FormField control={form.control} name="monthlyAllowance" render={({ field }) => ( <FormItem> <FormLabel>Beneficio Mensual Total ($)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Monto total disponible cada mes.</FormDescription> <FormMessage /> </FormItem> )} />
                 <FormField control={form.control} name="discountPercentage" render={({ field }) => ( <FormItem> <FormLabel>Porcentaje de Descuento (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Descuento a aplicar en cada compra.</FormDescription> <FormMessage /> </FormItem> )} />
                 <FormField control={form.control} name="alertThresholdPercentage" render={({ field }) => ( <FormItem> <FormLabel>Umbral de Alerta de Límite (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="enableEndOfMonthReminder" render={({ field }) => ( <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm"> <div className="space-y-0.5 flex-1 min-w-0 mr-4"> <FormLabel className="text-base flex items-center"><CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes</FormLabel> <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription> </div> <FormControl><Switch checked={field.value} onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)} /></FormControl> </FormItem> )} />
+                <FormField
+                  control={form.control}
+                  name="enableEndOfMonthReminder"
+                  render={({ field }) => (
+                    <FormItem className="rounded-lg border p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <FormLabel className="text-base flex items-center">
+                            <CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes
+                          </FormLabel>
+                          <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
+                          />
+                        </FormControl>
+                      </div>
+                    </FormItem>
+                  )}
+                />
                 {watchEnableEndOfMonthReminder && ( <FormField control={form.control} name="daysBeforeEndOfMonthToRemind" render={({ field }) => ( <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3"> <FormLabel>Días antes para recordar</FormLabel> <FormControl><Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl><FormMessage /></FormItem> )} /> )}
               </div>
               <Button type="submit" className="w-full" disabled={isSubmittingSettings}> {isSubmittingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isSubmittingSettings ? 'Guardando...' : (isInitialSetupScreen ? 'Guardar y Continuar' : 'Guardar Configuración')} </Button>
