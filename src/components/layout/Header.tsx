@@ -12,17 +12,18 @@ export function Header() {
       <div className="flex items-center gap-2 md:hidden">
         <SidebarTrigger />
       </div>
-      <Link href="/" className="flex items-center gap-2" aria-label={`${APP_NAME} homepage`}>
+      <Link href="/" className="flex items-center gap-2 shrink min-w-0" aria-label={`${APP_NAME} homepage`}>
         <Image
           src="/images/icono-alta512.png"
           alt="LEDESC Icon"
           width={32}
           height={32}
           data-ai-hint="logo abstract"
+          className="shrink-0"
         />
         <span
           style={{ color: '#2f4c92', fontFamily: 'Avenir Heavy, Helvetica, Arial, sans-serif', fontWeight: 900 }}
-          className="text-xl"
+          className="text-xl truncate"
         >
           {APP_NAME}
         </span>
@@ -34,4 +35,3 @@ export function Header() {
     </header>
   );
 }
-

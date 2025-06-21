@@ -56,18 +56,27 @@ export function TransactionDetailsDialog({ purchase, isOpen, onOpenChange }: Tra
           <Separator />
 
           <div className="space-y-2">
-             <h4 className="font-medium text-sm text-muted-foreground mb-2">Información del Monto:</h4>
-            <div className="flex justify-between items-center text-sm">
-              <span className="flex items-center"><DollarSign className="h-4 w-4 mr-1 text-muted-foreground" />Monto Original:</span>
-              <span>{formatCurrencyARS(purchase.amount)}</span>
+            <h4 className="font-medium text-sm text-muted-foreground mb-2">Información del Monto:</h4>
+            <div className="flex justify-between items-center text-sm gap-4">
+              <span className="flex items-center shrink min-w-0">
+                <DollarSign className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+                Monto Original:
+              </span>
+              <span className="font-medium whitespace-nowrap">{formatCurrencyARS(purchase.amount)}</span>
             </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="flex items-center"><Percent className="h-4 w-4 mr-1 text-muted-foreground" />Descuento Aplicado:</span>
-              <span className="text-green-600 dark:text-green-400">-{formatCurrencyARS(purchase.discountApplied)}</span>
+            <div className="flex justify-between items-center text-sm gap-4">
+              <span className="flex items-center shrink min-w-0">
+                <Percent className="h-4 w-4 mr-1 text-muted-foreground shrink-0" />
+                Descuento Aplicado:
+              </span>
+              <span className="font-medium text-green-600 dark:text-green-400 whitespace-nowrap">-{formatCurrencyARS(purchase.discountApplied)}</span>
             </div>
-            <div className="flex justify-between items-center text-md font-semibold">
-              <span className="flex items-center"><DollarSign className="h-4 w-4 mr-1 text-primary" />Monto Final:</span>
-              <span>{formatCurrencyARS(purchase.finalAmount)}</span>
+            <div className="flex justify-between items-center text-md font-semibold gap-4">
+              <span className="flex items-center shrink min-w-0">
+                <DollarSign className="h-4 w-4 mr-1 text-primary shrink-0" />
+                Monto Final:
+              </span>
+              <span className="whitespace-nowrap">{formatCurrencyARS(purchase.finalAmount)}</span>
             </div>
           </div>
 
