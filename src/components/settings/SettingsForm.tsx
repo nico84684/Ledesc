@@ -178,13 +178,13 @@ export function SettingsForm() {
         <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
         <CardContent className="space-y-6">
           <div className="p-3 border rounded-md bg-muted/50 text-sm"> 
-            <div className="flex items-center justify-between">
-              <div className='flex items-center'>
-                {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin" /> : <Info className="h-4 w-4 mr-2 text-primary"/>}
+            <div className="flex items-center justify-between gap-4">
+              <div className='flex items-center min-w-0'>
+                {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
                 <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
               </div>
               {user && (
-                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing}>
+                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0">
                   <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
                   Sincronizar Ahora
                 </Button>
