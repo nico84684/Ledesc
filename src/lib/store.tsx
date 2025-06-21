@@ -48,14 +48,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isSavingRef = useRef(false);
 
   // Stable sync function to avoid dependency loops.
-  const syncToDrive = useCallback(async (currentState: AppState, currentFileId: string | null) => {
-    if (!user || !accessToken || isSavingRef.current) return;
+  const syncToDrive = useCallback(async (currentState: AppState, currentFileId: string | null, isManual: boolean = false) => {
+    if (!user || !accessToken || (isSavingRef.current && !isManual)) return;
     
     isSavingRef.current = true;
     setIsSyncing(true);
+    if (isManual) {
+        toast({ title: 'Sincronizando...', description: 'Guardando datos en Google Drive.' });
+    }
     
     const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(accessToken, currentFileId, currentState);
     
+    if (isManual) dismiss(); // Dismiss the "Sincronizando..." toast
     setIsSyncing(false);
     isSavingRef.current = false;
 
@@ -68,6 +72,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
           duration: 10000,
       });
     } else {
+      if (isManual) {
+          toast({ title: 'Sincronización Manual Completa', description: 'Tus datos se guardaron en Google Drive.', duration: 4000 });
+      }
       if (newFileId) setDriveFileId(newFileId);
       // Update state with the new timestamp from the server to prevent re-syncing the same data.
       setState(prevState => {
@@ -80,7 +87,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return prevState;
       });
     }
-  }, [user, accessToken, toast]); // Depends on stable user info and toast.
+  }, [user, accessToken, toast, dismiss]);
 
   // Effect for initial data loading and reconciliation.
   useEffect(() => {
@@ -104,36 +111,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (error) {
           toast({ title: 'Error de Sincronización', description: `No se pudo conectar con Drive: ${error}. Usando datos locales.`, variant: 'destructive' });
         } else {
-          // --- NEW, ROBUST RECONCILIATION LOGIC ---
           if (driveData && localState) {
-            // Case 1: Both local and drive data exist. Compare timestamps.
             const localTimestamp = localState.settings.lastBackupTimestamp || 0;
             const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
-            setDriveFileId(currentFileId);
+            if(currentFileId) setDriveFileId(currentFileId);
 
             if (driveTimestamp > localTimestamp) {
-              // Drive is newer, PULL data from Drive.
               setState(driveData);
               localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
               toast({ title: 'Sincronización Completa', description: 'Datos actualizados desde Google Drive.', duration: 3000 });
             } else if (localTimestamp > driveTimestamp) {
-              // Local is newer, PUSH local data to Drive.
               toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
-              syncToDrive(localState, currentFileId);
+              syncToDrive(localState, currentFileId, false);
             }
-            // If timestamps are equal, do nothing.
           } else if (driveData) {
-            // Case 2: Only Drive data exists (e.g., new device). PULL from Drive.
             setState(driveData);
             localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(driveData));
-            setDriveFileId(currentFileId);
+            if(currentFileId) setDriveFileId(currentFileId);
             toast({ title: 'Sincronización Completa', description: 'Datos cargados desde Google Drive.', duration: 3000 });
           } else if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
-            // Case 3: Only local data exists and it's not empty. PUSH to Drive for the first time.
             toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
-            syncToDrive(localState, null);
+            syncToDrive(localState, null, false);
           }
-          // Case 4 (implicit): Both are null. Do nothing, app starts fresh.
         }
       }
       setIsInitialized(true);
@@ -159,7 +158,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       debounceTimer.current = setTimeout(() => {
         // Avoid syncing if state hasn't been properly loaded from Drive yet
         if(state.settings.lastBackupTimestamp || (state.purchases.length > 0 || state.merchants.length > 0)) {
-           syncToDrive(state, driveFileId);
+           syncToDrive(state, driveFileId, false);
         }
       }, 2500);
     }
@@ -298,7 +297,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, state.settings]);
 
   const forceSyncCallback = useCallback(() => {
-    syncToDrive(state, driveFileId);
+    syncToDrive(state, driveFileId, true);
   }, [state, driveFileId, syncToDrive]);
 
 
