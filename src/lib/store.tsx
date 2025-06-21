@@ -90,7 +90,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       let localState: AppState | null = null;
       if (localStateJSON) {
         localState = JSON.parse(localStateJSON);
-        setState(localState);
+        if (localState) {
+          setState(localState);
+        }
       }
 
       // 2. If logged in, attempt to reconcile with Drive data.
