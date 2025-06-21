@@ -44,13 +44,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [driveFileId, setDriveFileId] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Use a ref to store the latest auth data to prevent stale closures in callbacks.
+  const authDataRef = useRef({ user, accessToken });
+  useEffect(() => {
+    authDataRef.current = { user, accessToken };
+  }, [user, accessToken]);
   
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
 
   // Stable sync function to avoid dependency loops.
   const syncToDrive = useCallback(async (currentState: AppState, currentFileId: string | null, isManual: boolean = false) => {
-    if (!user || !accessToken) {
+    const { user: currentUser, accessToken: currentAccessToken } = authDataRef.current;
+
+    if (!currentUser || !currentAccessToken) {
         if(isManual) toast({ title: "Inicia Sesión", description: "Debes iniciar sesión con Google para sincronizar.", variant: "destructive" });
         return;
     };
@@ -62,9 +70,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         toast({ title: 'Sincronizando...', description: 'Guardando datos en Google Drive.' });
     }
     
-    const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(accessToken, currentFileId, currentState);
+    const { fileId: newFileId, error, lastBackupTimestamp } = await saveDriveData(currentAccessToken, currentFileId, currentState);
     
-    if (isManual) dismiss(); // Dismiss the "Sincronizando..." toast
+    if (isManual) dismiss();
     setIsSyncing(false);
     isSavingRef.current = false;
 
@@ -81,26 +89,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
           toast({ title: 'Sincronización Manual Completa', description: 'Tus datos se guardaron en Google Drive.', duration: 4000 });
       }
       if (newFileId) setDriveFileId(newFileId);
-      // On success, update state with the new timestamp from the server and set dirty flag to false.
       setState(prevState => ({
         ...prevState,
         settings: { ...prevState.settings, lastBackupTimestamp },
         isStateDirty: false,
       }));
     }
-  }, [user, accessToken, toast, dismiss]);
+  }, [toast, dismiss]);
 
   // Effect for initial data loading and reconciliation.
   useEffect(() => {
     const loadData = async () => {
-      // 1. Load local data first to provide an immediate UI.
       const localStateJSON = localStorage.getItem(LOCAL_STORAGE_STATE_KEY);
       let localState: AppState | null = localStateJSON ? JSON.parse(localStateJSON) : null;
       if (localState) {
         setState(localState);
       }
 
-      // 2. If logged in, attempt to reconcile with Drive data.
       if (user && accessToken) {
         toast({ title: 'Sincronizando...', description: 'Buscando datos en Google Drive.' });
         const { data: driveData, fileId: currentFileId, error } = await getDriveData(accessToken);
@@ -111,25 +116,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
         } else {
           setDriveFileId(currentFileId);
 
-          if (driveData) { // Drive has data, begin reconciliation
+          if (driveData) {
             const driveTimestamp = driveData.settings.lastBackupTimestamp || 0;
             const localTimestamp = localState?.settings.lastBackupTimestamp || 0;
             
             if (driveTimestamp > localTimestamp) {
-              // Cloud is newer, overwrite local state. Mark as clean.
               const cleanState = { ...driveData, isStateDirty: false };
               setState(cleanState);
               localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(cleanState));
               toast({ title: 'Sincronización Completa', description: 'Datos actualizados desde Google Drive.', duration: 3000 });
             } else if (localState?.isStateDirty) {
-              // Local has unsynced changes. Push them.
-              toast({ title: 'Sincronizando Cambios', description: 'Guardando cambios locales en Google Drive.' });
               syncToDrive(localState, currentFileId, false);
             }
-          } else { // Drive has NO data
+          } else {
             if (localState && (localState.purchases.length > 0 || localState.merchants.length > 0)) {
-              // Local has data, Drive is empty. First-time sync for this account.
-              toast({ title: 'Configurando Nube', description: 'Guardando tus datos en Google Drive por primera vez.' });
               syncToDrive(localState, null, false);
             }
           }
@@ -147,11 +147,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!isInitialized) return;
 
-    // 1. Always save locally first.
     localStorage.setItem(LOCAL_STORAGE_STATE_KEY, JSON.stringify(state));
+    const { user: currentUser, accessToken: currentAccessToken } = authDataRef.current;
 
-    // 2. Debounce the sync to Drive if the state is dirty.
-    if (user && accessToken && state.isStateDirty) {
+    if (currentUser && currentAccessToken && state.isStateDirty) {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
       debounceTimer.current = setTimeout(() => {
         syncToDrive(state, driveFileId, false);
@@ -161,7 +160,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => {
       if (debounceTimer.current) clearTimeout(debounceTimer.current);
     };
-  }, [state, isInitialized, user, accessToken, driveFileId, syncToDrive]);
+  }, [state, isInitialized, driveFileId, syncToDrive]);
 
   const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount' | 'receiptImageUrl'>) => {
     setState(prevState => {
@@ -293,7 +292,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [toast, state.settings]);
 
   const forceSyncCallback = useCallback(() => {
-    if (!user) {
+    const { user: currentUser } = authDataRef.current;
+    if (!currentUser) {
         toast({ title: "Inicia Sesión", description: "Debes iniciar sesión con Google para sincronizar.", variant: "destructive" });
         return;
     }
@@ -302,7 +302,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         return;
     }
     syncToDrive(state, driveFileId, true);
-  }, [state, driveFileId, syncToDrive, user, isSyncing, toast]);
+  }, [state, driveFileId, syncToDrive, isSyncing, toast]);
 
 
   return (
@@ -328,7 +328,3 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
-
-    
-
-    
