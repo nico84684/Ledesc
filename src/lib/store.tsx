@@ -58,6 +58,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const previousMerchantsRef = useRef<Merchant[]>();
   const firestoreUnsubscribersRef = useRef<(() => void)[]>([]);
 
+  const handleFirestoreError = useCallback((error: any, context: string) => {
+    console.error(`[AppStore] Firestore error in ${context}:`, error);
+    // Use a toast to inform the user about persistent connection issues
+    if (error.code === 'permission-denied' || error.code === 'unauthenticated' || error.code === 'unavailable' || (error.message && (error.message.includes('offline') || error.message.includes('RPC') || error.message.includes('400')))) {
+        toast({
+            title: 'Error de Sincronización con la Nube',
+            description: `No se pudo conectar con Firestore (${context}). Verifica que la API de Cloud Firestore esté habilitada en tu proyecto de Google Cloud y que tu clave de API no tenga restricciones de dominio.`,
+            variant: 'destructive',
+            duration: 30000,
+        });
+    }
+  }, [toast]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -87,36 +99,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 // console.log("[AppStore] No Firestore settings, setup not complete, redirecting to /settings");
                 router.push('/settings');
             }
-          }, (error) => console.error("[AppStore] Error listening to settings:", error));
+          }, (error) => handleFirestoreError(error, 'listeners de configuración'));
           firestoreUnsubscribersRef.current.push(settingsUnsub);
 
           const purchasesUnsub = onSnapshot(purchasesQuery, (snapshot) => {
             const purchasesFromFirestore = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Purchase));
             setState(prevState => ({ ...prevState, purchases: purchasesFromFirestore }));
             previousPurchasesRef.current = purchasesFromFirestore;
-          }, (error) => console.error("[AppStore] Error listening to purchases:", error));
+          }, (error) => handleFirestoreError(error, 'listeners de compras'));
           firestoreUnsubscribersRef.current.push(purchasesUnsub);
 
           const merchantsUnsub = onSnapshot(merchantsQuery, (snapshot) => {
             const merchantsFromFirestore = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Merchant));
             setState(prevState => ({ ...prevState, merchants: merchantsFromFirestore }));
             previousMerchantsRef.current = merchantsFromFirestore;
-          }, (error) => console.error("[AppStore] Error listening to merchants:", error));
+          }, (error) => handleFirestoreError(error, 'listeners de comercios'));
           firestoreUnsubscribersRef.current.push(merchantsUnsub);
 
           try {
             await Promise.all([getDoc(settingsDocRef), getDocs(purchasesQuery), getDocs(merchantsQuery)]);
           } catch (error: any) {
-            console.error("[AppStore] Error during initial Firestore batch load:", error);
-            // Display a user-friendly toast for persistent connection issues
-            if (error.code === 'unavailable' || (error.message && error.message.includes('offline'))) {
-               toast({
-                title: 'Error de Conexión con Firestore',
-                description: 'No se pudieron cargar los datos. Esto puede deberse a un problema de red o a la configuración de tu proyecto Firebase (verifica que la API de Firestore esté habilitada y que tu clave de API no tenga restricciones de dominio).',
-                variant: 'destructive',
-                duration: 20000,
-              });
-            }
+            handleFirestoreError(error, 'carga inicial de datos');
           } finally { 
             setIsFirestoreLoading(false);
             setIsInitialized(true); 
@@ -152,7 +155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       firestoreUnsubscribersRef.current.forEach(unsub => unsub());
       firestoreUnsubscribersRef.current = [];
     };
-  }, [user, isFirebaseAuthReady, router, pathname]);
+  }, [user, isFirebaseAuthReady, router, pathname, handleFirestoreError]);
 
 
   useEffect(() => {
@@ -516,6 +519,7 @@ export function useAppDispatch() {
   if (context === undefined) throw new Error('useAppDispatch must be used within an AppProvider');
   return context;
 }
+
 
 
 
