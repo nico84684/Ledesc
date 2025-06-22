@@ -169,22 +169,21 @@ export function SettingsForm() {
                   control={form.control}
                   name="enableEndOfMonthReminder"
                   render={({ field }) => (
-                    <FormItem className="rounded-lg border p-4 shadow-sm">
-                      <div className="grid grid-cols-[1fr_auto] items-center gap-4">
-                        <div className="space-y-0.5">
-                          <FormLabel className="text-base flex items-center">
-                            <CalendarClock className="mr-2 h-4 w-4 shrink-0" />
-                            <span>Recordatorio de Fin de Mes</span>
-                          </FormLabel>
-                          <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
-                          />
-                        </FormControl>
+                    <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 shadow-sm gap-4">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base leading-snug">
+                          Recordatorio de Fin de Mes
+                        </FormLabel>
+                        <FormDescription className="leading-tight">
+                          Recibir notificación si queda saldo pendiente.
+                        </FormDescription>
                       </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
+                        />
+                      </FormControl>
                     </FormItem>
                   )}
                 />
@@ -226,3 +225,5 @@ export function SettingsForm() {
     </div>
   );
 }
+
+    
