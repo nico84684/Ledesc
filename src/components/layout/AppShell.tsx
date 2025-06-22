@@ -26,9 +26,9 @@ export function AppShell({ children }: AppShellProps) {
         </Sidebar>
         <SidebarInset>
           <Header />
-          <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
+          <div className="flex-1 p-4 md:p-6 lg:p-8 bg-background min-w-0">
             {children}
-          </main>
+          </div>
           <Toaster />
         </SidebarInset>
       </SidebarProvider>

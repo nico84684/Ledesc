@@ -173,7 +173,8 @@ export function SettingsForm() {
                       <div className="flex items-center justify-between gap-4">
                         <div className="space-y-0.5 min-w-0">
                           <FormLabel className="text-base flex items-center">
-                            <CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes
+                            <CalendarClock className="mr-2 h-4 w-4 shrink-0" />
+                            <span>Recordatorio de Fin de Mes</span>
                           </FormLabel>
                           <FormDescription>Recibir notificación si queda saldo pendiente.</FormDescription>
                         </div>
