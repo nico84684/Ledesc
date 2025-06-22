@@ -130,100 +130,102 @@ export function SettingsForm() {
     : `Los datos se guardan localmente.`;
 
   return (
-    <div className="w-full max-w-2xl mx-auto space-y-8 pb-8">
-      {isInitialSetupScreen && (
-        <Card className="border-primary shadow-lg animate-in fade-in-50 duration-500">
+    <div className="container mx-auto py-8">
+      <div className="w-full max-w-2xl mx-auto space-y-8 pb-8">
+        {isInitialSetupScreen && (
+          <Card className="border-primary shadow-lg animate-in fade-in-50 duration-500">
+            <CardHeader>
+              <CardTitle className="text-xl text-primary flex items-center">
+                <Info className="h-5 w-5 mr-2" />
+                ¡Bienvenido/a a {APP_NAME}!
+              </CardTitle>
+              <CardDescription>
+                Para comenzar, revisa y guarda tu configuración inicial. Si deseas, puedes
+                <Button variant="link" className="p-0 h-auto mx-1 inline text-primary hover:underline" onClick={signIn}>
+                  iniciar sesión con Google
+                </Button>
+                para guardar tus datos en Google Drive y acceder desde múltiples dispositivos. De lo contrario, tus datos se guardarán solo en este navegador.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        )}
+        <Card className="shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl text-primary flex items-center">
-              <Info className="h-5 w-5 mr-2" />
-              ¡Bienvenido/a a {APP_NAME}!
+            <CardTitle className="text-2xl">
+              {isInitialSetupScreen ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
             </CardTitle>
             <CardDescription>
-              Para comenzar, revisa y guarda tu configuración inicial. Si deseas, puedes
-              <Button variant="link" className="p-0 h-auto mx-1 inline text-primary hover:underline" onClick={signIn}>
-                 iniciar sesión con Google
-              </Button>
-              para guardar tus datos en Google Drive y acceder desde múltiples dispositivos. De lo contrario, tus datos se guardarán solo en este navegador.
+              {isInitialSetupScreen ? "Establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico."}
+              {user ? " Los cambios se guardarán automáticamente en tu archivo de Google Drive." : " Los cambios se guardarán localmente en este navegador."}
             </CardDescription>
           </CardHeader>
-        </Card>
-      )}
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-2xl">
-            {isInitialSetupScreen ? "Configuración Inicial del Beneficio" : "Configuración del Beneficio"}
-          </CardTitle>
-          <CardDescription>
-            {isInitialSetupScreen ? "Establece los parámetros iniciales de tu beneficio." : "Ajusta los parámetros de tu beneficio gastronómico."}
-            {user ? " Los cambios se guardarán automáticamente en tu archivo de Google Drive." : " Los cambios se guardarán localmente en este navegador."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmitSettings)} className="space-y-8">
-              <div className="space-y-6">
-                <FormField control={form.control} name="monthlyAllowance" render={({ field }) => ( <FormItem> <FormLabel>Beneficio Mensual Total ($)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Monto total disponible cada mes.</FormDescription> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="discountPercentage" render={({ field }) => ( <FormItem> <FormLabel>Porcentaje de Descuento (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Descuento a aplicar en cada compra.</FormDescription> <FormMessage /> </FormItem> )} />
-                <FormField control={form.control} name="alertThresholdPercentage" render={({ field }) => ( <FormItem> <FormLabel>Umbral de Alerta de Límite (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription> <FormMessage /> </FormItem> )} />
-                <FormField
-                  control={form.control}
-                  name="enableEndOfMonthReminder"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-start justify-between rounded-lg border p-4 shadow-sm gap-4">
-                      <div className="space-y-0.5">
-                        <FormLabel className="text-base leading-snug">
-                          Recordatorio de Fin de Mes
-                        </FormLabel>
-                        <FormDescription className="leading-tight">
-                          Recibir notificación si queda saldo pendiente.
-                        </FormDescription>
-                      </div>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-                {watchEnableEndOfMonthReminder && ( <FormField control={form.control} name="daysBeforeEndOfMonthToRemind" render={({ field }) => ( <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3"> <FormLabel>Días antes para recordar</FormLabel> <FormControl><Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl><FormMessage /></FormItem> )} /> )}
-              </div>
-              <Button type="submit" className="w-full" disabled={isSubmittingSettings}> {isSubmittingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isSubmittingSettings ? 'Guardando...' : (isInitialSetupScreen ? 'Guardar y Continuar' : 'Guardar Configuración')} </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmitSettings)} className="space-y-8">
+                <div className="space-y-6">
+                  <FormField control={form.control} name="monthlyAllowance" render={({ field }) => ( <FormItem> <FormLabel>Beneficio Mensual Total ($)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 68500" {...field} step="0.01" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Monto total disponible cada mes.</FormDescription> <FormMessage /> </FormItem> )} />
+                  <FormField control={form.control} name="discountPercentage" render={({ field }) => ( <FormItem> <FormLabel>Porcentaje de Descuento (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 70" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Descuento a aplicar en cada compra.</FormDescription> <FormMessage /> </FormItem> )} />
+                  <FormField control={form.control} name="alertThresholdPercentage" render={({ field }) => ( <FormItem> <FormLabel>Umbral de Alerta de Límite (%)</FormLabel> <FormControl><Input type="number" placeholder="Ej: 80" {...field} min="0" max="100" value={field.value || ''} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl> <FormDescription>Notificar cuando se alcance este porcentaje del límite.</FormDescription> <FormMessage /> </FormItem> )} />
+                  
+                  <FormField
+                    control={form.control}
+                    name="enableEndOfMonthReminder"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
+                        <div className="space-y-0.5 min-w-0 pr-4">
+                          <FormLabel className="text-base">
+                            Recordatorio de Fin de Mes
+                          </FormLabel>
+                          <FormDescription>
+                            Recibir notificación si queda saldo pendiente.
+                          </FormDescription>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
 
-      <Card className="shadow-lg">
-        <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="p-3 border rounded-md bg-muted/50 text-sm"> 
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className='flex items-center min-w-0'>
-                {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
-                <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
+                  {watchEnableEndOfMonthReminder && ( <FormField control={form.control} name="daysBeforeEndOfMonthToRemind" render={({ field }) => ( <FormItem className="pl-4 pr-4 pb-2 -mt-3 border border-t-0 rounded-b-lg pt-3"> <FormLabel>Días antes para recordar</FormLabel> <FormControl><Input type="number" placeholder="Ej: 3" {...field} min="1" max="15" value={field.value || ''} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl><FormMessage /></FormItem> )} /> )}
+                </div>
+                <Button type="submit" className="w-full" disabled={isSubmittingSettings}> {isSubmittingSettings ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} {isSubmittingSettings ? 'Guardando...' : (isInitialSetupScreen ? 'Guardar y Continuar' : 'Guardar Configuración')} </Button>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-lg">
+          <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="p-3 border rounded-md bg-muted/50 text-sm"> 
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div className='flex items-center min-w-0'>
+                  {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
+                  <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
+                </div>
+                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
+                  <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
+                  Sincronizar Ahora
+                </Button>
               </div>
-              <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
-                <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
-                Sincronizar Ahora
-              </Button>
             </div>
-           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary"/>Backup a Excel</h4> <Separator />
-              <Button onClick={backupToExcel} className="w-full" variant="outline"><DownloadCloud className="mr-2 h-4 w-4" />Guardar a Excel (Local)</Button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary"/>Backup a Excel</h4> <Separator />
+                <Button onClick={backupToExcel} className="w-full" variant="outline"><DownloadCloud className="mr-2 h-4 w-4" />Guardar a Excel (Local)</Button>
+              </div>
+              <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><FileDown className="mr-2 h-5 w-5 text-primary"/>Restaurar desde Excel</h4> <Separator /> 
+                  <AlertDialog> <AlertDialogTrigger asChild><Button className="w-full" variant="outline" disabled={isRestoringFromExcel}>{isRestoringFromExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{isRestoringFromExcel ? 'Restaurando...' : 'Seleccionar archivo...'}</Button></AlertDialogTrigger>
+                      <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restaurar desde Excel</AlertDialogTitle><AlertDialogDescription>Esta acción reemplazará todos tus datos actuales (compras, comercios y configuración) con el contenido del archivo. ¿Estás seguro?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => fileInputRef.current?.click()}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+                  </AlertDialog> <input type="file" ref={fileInputRef} onChange={handleExcelRestoreFileSelect} accept=".xlsx,.xls" className="hidden" disabled={isRestoringFromExcel}/>
+              </div>
             </div>
-            <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><FileDown className="mr-2 h-5 w-5 text-primary"/>Restaurar desde Excel</h4> <Separator /> 
-                <AlertDialog> <AlertDialogTrigger asChild><Button className="w-full" variant="outline" disabled={isRestoringFromExcel}>{isRestoringFromExcel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UploadCloud className="mr-2 h-4 w-4" />}{isRestoringFromExcel ? 'Restaurando...' : 'Seleccionar archivo...'}</Button></AlertDialogTrigger>
-                    <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restaurar desde Excel</AlertDialogTitle><AlertDialogDescription>Esta acción reemplazará todos tus datos actuales (compras, comercios y configuración) con el contenido del archivo. ¿Estás seguro?</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancelar</AlertDialogCancel><AlertDialogAction onClick={() => fileInputRef.current?.click()}>Continuar</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
-                </AlertDialog> <input type="file" ref={fileInputRef} onChange={handleExcelRestoreFileSelect} accept=".xlsx,.xls" className="hidden" disabled={isRestoringFromExcel}/>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
-
-    
