@@ -125,9 +125,9 @@ export function SettingsForm() {
   const lastSyncTimestamp = settings?.lastBackupTimestamp;
   const lastSyncDisplay = user
     ? lastSyncTimestamp && lastSyncTimestamp > 0
-      ? `Última sincronización: ${format(new Date(lastSyncTimestamp), "dd MMM yyyy, HH:mm", { locale: es })}`
-      : `Pendiente de sincronización con Google Drive.`
-    : `Los datos se guardan localmente.`;
+      ? `Sincronizado: ${format(new Date(lastSyncTimestamp), "dd/MM/yy, HH:mm", { locale: es })}`
+      : `Pendiente de sincronización.`
+    : `Datos guardados localmente.`;
 
   return (
     <div className="container mx-auto py-8">
@@ -171,22 +171,23 @@ export function SettingsForm() {
                     control={form.control}
                     name="enableEndOfMonthReminder"
                     render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                        <div className="min-w-0 space-y-0.5">
-                          <FormLabel className="text-base">
-                            Recordatorio de Fin de Mes
-                          </FormLabel>
-                          <FormDescription>
-                            Recibir notificación si queda saldo pendiente.
-                          </FormDescription>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
-                            className="ml-4"
-                          />
-                        </FormControl>
+                      <FormItem className="rounded-lg border p-4 shadow-sm">
+                          <div className="flex items-center justify-between space-x-4">
+                              <div className="flex-1 space-y-0.5">
+                                  <FormLabel className="text-base">
+                                      Recordatorio de Fin de Mes
+                                  </FormLabel>
+                                  <FormDescription>
+                                      Recibir notificación si queda saldo pendiente.
+                                  </FormDescription>
+                              </div>
+                              <FormControl>
+                                  <Switch
+                                      checked={field.value}
+                                      onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
+                                  />
+                              </FormControl>
+                          </div>
                       </FormItem>
                     )}
                   />
@@ -203,16 +204,16 @@ export function SettingsForm() {
           <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
           <CardContent className="space-y-6">
             <div className="p-3 border rounded-md bg-muted/50 text-sm">
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-                <div className='flex items-center min-w-0'>
-                  {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
-                  <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <div className='flex items-center min-w-0'>
+                      {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
+                      <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
+                    </div>
+                    <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto">
+                      <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
+                      Sincronizar Ahora
+                    </Button>
                 </div>
-                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto">
-                  <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
-                  Sincronizar Ahora
-                </Button>
-              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-4 p-4 border rounded-lg shadow-sm"> <h4 className="font-semibold text-lg flex items-center"><FileUp className="mr-2 h-5 w-5 text-primary"/>Backup a Excel</h4> <Separator />
@@ -230,3 +231,5 @@ export function SettingsForm() {
     </div>
   );
 }
+
+    
