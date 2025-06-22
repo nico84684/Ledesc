@@ -43,7 +43,7 @@ export function BenefitUsageSummary() {
             return false;
           }
       })
-      .reduce((sum, p) => sum + p.finalAmount, 0);
+      .reduce((sum, p) => sum + p.discountApplied, 0);
     
     const balance = Math.max(0, settings.monthlyAllowance - totalSpent);
     const percentUsed = settings.monthlyAllowance > 0 ? (totalSpent / settings.monthlyAllowance) * 100 : 0;
