@@ -172,7 +172,7 @@ export function SettingsForm() {
                     name="enableEndOfMonthReminder"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm">
-                        <div className="space-y-0.5 min-w-0 pr-4">
+                        <div className="min-w-0 space-y-0.5">
                           <FormLabel className="text-base">
                             Recordatorio de Fin de Mes
                           </FormLabel>
@@ -184,6 +184,7 @@ export function SettingsForm() {
                           <Switch
                             checked={field.value}
                             onCheckedChange={(c) => handleSwitchChange("enableEndOfMonthReminder", c)}
+                            className="ml-4"
                           />
                         </FormControl>
                       </FormItem>
@@ -201,13 +202,13 @@ export function SettingsForm() {
         <Card className="shadow-lg">
           <CardHeader> <CardTitle className="text-xl">Gestión de Datos</CardTitle> <CardDescription>Realiza backups y gestiona la sincronización de tus datos.</CardDescription> </CardHeader>
           <CardContent className="space-y-6">
-            <div className="p-3 border rounded-md bg-muted/50 text-sm"> 
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div className="p-3 border rounded-md bg-muted/50 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <div className='flex items-center min-w-0'>
                   {isSyncing && user ? <RefreshCw className="h-4 w-4 mr-2 text-primary animate-spin shrink-0" /> : <Info className="h-4 w-4 mr-2 text-primary shrink-0"/>}
                   <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
                 </div>
-                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
+                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto">
                   <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
                   Sincronizar Ahora
                 </Button>
