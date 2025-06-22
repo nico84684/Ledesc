@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function MerchantsPage() {
   return (
-    <div className="space-y-8">
+    <div className="container mx-auto space-y-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Comercios Adheridos

@@ -171,7 +171,7 @@ export function SettingsForm() {
                   render={({ field }) => (
                     <FormItem className="rounded-lg border p-4 shadow-sm">
                       <div className="flex items-center justify-between gap-4">
-                        <div className="space-y-0.5">
+                        <div className="space-y-0.5 min-w-0">
                           <FormLabel className="text-base flex items-center">
                             <CalendarClock className="mr-2 h-4 w-4" />Recordatorio de Fin de Mes
                           </FormLabel>
@@ -205,7 +205,7 @@ export function SettingsForm() {
                 <span className="truncate">{isSyncing && user ? "Sincronizando..." : lastSyncDisplay}</span>
               </div>
               {user && (
-                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto">
+                <Button onClick={forceSync} variant="outline" size="sm" disabled={isSyncing} className="shrink-0 w-full sm:w-auto mt-2 sm:mt-0">
                   <RefreshCw className={cn("mr-2 h-4 w-4", isSyncing && "animate-spin")} />
                   Sincronizar Ahora
                 </Button>
