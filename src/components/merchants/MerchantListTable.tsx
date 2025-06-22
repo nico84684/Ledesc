@@ -93,7 +93,6 @@ export function MerchantListTable() {
               </TableCaption>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[100px]">ID (Interno)</TableHead>
                   <TableHead>Nombre del Comercio</TableHead>
                   <TableHead>Ubicación</TableHead>
                 </TableRow>
@@ -101,9 +100,6 @@ export function MerchantListTable() {
               <TableBody>
                 {paginatedMerchants.map((merchant) => (
                   <TableRow key={merchant.id}>
-                    <TableCell className="font-mono text-xs opacity-75 truncate" title={merchant.id}>
-                      {merchant.id.substring(0, 8)}...
-                    </TableCell>
                     <TableCell className="font-medium">{merchant.name}</TableCell>
                     <TableCell>
                       {merchant.location ? (
