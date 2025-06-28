@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { useAppState, useAppDispatch } from '@/lib/store';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { DollarSign, PieChart, TrendingUp, CalendarClock } from 'lucide-react';
+import { DollarSign, PieChart, TrendingUp, CalendarClock, Calculator } from 'lucide-react';
 import { format, parseISO, isSameMonth, getDaysInMonth, getDate } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useIsMobile } from '@/hooks/use-mobile'; // Corrected import path
@@ -18,6 +18,7 @@ interface ClientCalculatedData {
   remainingBalance: number;
   percentageUsed: number;
   remainingDaysInMonth: number;
+  requiredPurchaseValue: number;
 }
 
 export function BenefitUsageSummary() {
@@ -52,12 +53,17 @@ export function BenefitUsageSummary() {
     const currentDayOfMonth = getDate(currentMonthDate);
     const daysLeft = daysInMonth - currentDayOfMonth;
 
+    const requiredPurchaseValue = settings.discountPercentage > 0
+      ? balance / (settings.discountPercentage / 100)
+      : 0;
+
     setClientData({
       formattedMonthYear: formatDateSafe(currentMonthDate.toISOString(), "MMMM yyyy", es),
       totalSpentThisMonth: totalSpent,
       remainingBalance: balance,
       percentageUsed: percentUsed,
       remainingDaysInMonth: daysLeft,
+      requiredPurchaseValue: requiredPurchaseValue,
     });
 
   }, [purchases, settings, isAppStoreInitialized]);
@@ -144,6 +150,15 @@ export function BenefitUsageSummary() {
           </div>
           <Progress value={clientData.percentageUsed} aria-label={`${clientData.percentageUsed.toFixed(1)}% del beneficio utilizado`} className="h-3" />
         </div>
+
+        {clientData.requiredPurchaseValue > 0 && (
+          <div className="flex items-center justify-center gap-3 p-3 text-sm text-center border rounded-lg bg-muted/50">
+            <Calculator className="h-5 w-5 text-muted-foreground shrink-0" />
+            <p className="text-muted-foreground">
+              Compra por <span className="font-semibold text-foreground">{formatCurrencyARS(clientData.requiredPurchaseValue)}</span> para consumir el saldo restante.
+            </p>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row items-center text-center sm:text-left justify-center p-3 border rounded-lg bg-card shadow-sm">
           <CalendarClock className="h-6 w-6 text-primary mb-2 sm:mb-0 sm:mr-3" />
