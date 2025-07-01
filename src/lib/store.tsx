@@ -6,7 +6,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import type { Purchase, BenefitSettings, AppState, Merchant } from '@/types';
 import { DEFAULT_BENEFIT_SETTINGS, APP_NAME } from '@/config/constants';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO, isValid } from 'date-fns';
+import { format, parseISO, isValid, isSameMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/components/layout/Providers';
@@ -164,7 +164,22 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const addPurchase = useCallback((purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount' | 'receiptImageUrl'>) => {
     setState(prevState => {
-      const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
+      const purchaseDate = parseISO(purchaseData.date);
+      
+      const totalSpentForMonth = prevState.purchases
+        .filter(p => {
+            try {
+              return isSameMonth(parseISO(p.date), purchaseDate);
+            } catch {
+              return false;
+            }
+        })
+        .reduce((sum, p) => sum + p.discountApplied, 0);
+
+      const remainingBalance = Math.max(0, prevState.settings.monthlyAllowance - totalSpentForMonth);
+      const potentialDiscount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
+      const actualDiscount = Math.min(potentialDiscount, remainingBalance);
+
       const newPurchase: Purchase = {
         id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         amount: purchaseData.amount,
@@ -173,8 +188,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         merchantLocation: purchaseData.merchantLocation?.trim() || undefined,
         description: purchaseData.description || undefined,
         receiptImageUrl: undefined,
-        discountApplied: parseFloat(discountAmount.toFixed(2)),
-        finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
+        discountApplied: parseFloat(actualDiscount.toFixed(2)),
+        finalAmount: parseFloat((purchaseData.amount - actualDiscount).toFixed(2)),
       };
       
       const updatedPurchases = [...prevState.purchases, newPurchase].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
@@ -190,12 +205,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const editPurchase = useCallback((purchaseId: string, purchaseData: Omit<Purchase, 'id' | 'discountApplied' | 'finalAmount' | 'receiptImageUrl'>) => {
     setState(prevState => {
-      const discountAmount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
+      const purchaseDate = parseISO(purchaseData.date);
+      
+      const totalSpentForMonthExcludingThis = prevState.purchases
+        .filter(p => {
+          if (p.id === purchaseId) return false;
+          try {
+            return isSameMonth(parseISO(p.date), purchaseDate);
+          } catch {
+            return false;
+          }
+        })
+        .reduce((sum, p) => sum + p.discountApplied, 0);
+      
+      const remainingBalanceForThisPurchase = Math.max(0, prevState.settings.monthlyAllowance - totalSpentForMonthExcludingThis);
+      const potentialDiscount = (purchaseData.amount * prevState.settings.discountPercentage) / 100;
+      const actualDiscount = Math.min(potentialDiscount, remainingBalanceForThisPurchase);
+
       const updatedCoreData = {
           ...purchaseData,
-          discountApplied: parseFloat(discountAmount.toFixed(2)),
-          finalAmount: parseFloat((purchaseData.amount - discountAmount).toFixed(2)),
+          discountApplied: parseFloat(actualDiscount.toFixed(2)),
+          finalAmount: parseFloat((purchaseData.amount - actualDiscount).toFixed(2)),
       };
+      
       return {
         ...prevState,
         purchases: prevState.purchases.map(p => p.id === purchaseId ? { ...p, ...updatedCoreData } : p),
