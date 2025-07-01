@@ -209,9 +209,6 @@ export default function HelpPage() {
                   <li>{APP_NAME} **no tiene acceso** a ningún otro archivo o carpeta en tu Drive, solo a la carpeta `Ledesc Sync` y los archivos que ella misma crea y gestiona dentro de esa carpeta.</li>
                   <li>Tu contraseña de Google nunca es almacenada ni vista por {APP_NAME}. La autenticación se maneja de forma segura a través de los servicios de Google.</li>
                 </ul>
-                
-                <p><strong>No Compartimos tus Datos:</strong></p>
-                <p>Tu información personal y los datos de tus transacciones no se comparten con terceros sin tu consentimiento explícito.</p>
               </AccordionContent>
             </AccordionItem>
 
